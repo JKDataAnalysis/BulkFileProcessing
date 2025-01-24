@@ -5,6 +5,7 @@ from tkinter.filedialog import askdirectory
 import os
 
 # >>>> Check tkinter works across OSs
+#   Yes it does, Mac, Linux and Windows
 
 # 1) Select file types to load
 # - Would be good to save a user preferences file, e.g. default file types to use.
