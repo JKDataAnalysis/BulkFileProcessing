@@ -1,7 +1,8 @@
 '''
 Done so far
 ===========
-* Read in data file type with option to select a file if the default file is not found
+* Read in data file definitions
+* Allow user to select from defined data file types
 TODO
 ====
 Lots!
