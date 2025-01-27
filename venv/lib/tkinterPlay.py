@@ -1,5 +1,3 @@
-from tarfile import data_filter
-
 '''
 Done so far
 ===========
