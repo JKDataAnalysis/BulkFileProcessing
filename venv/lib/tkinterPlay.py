@@ -1,22 +1,8 @@
-'''
-Done so far
-===========
-* Read in data file definitions
-* Created main screen
-    - ComboBox: select data file type
-        - Allows user to select from defined data file types
-    - Button to select data folder containing data files
-    - Label: n data files in selected folder
-    - Button: Start analysis: run the thing
-        - NOT YET IMPLEMENTED
-    - Button: Reset window
-        - clears set values
-    - Button: Quit script
+"""
 TODO
 ====
 * Add validation to read of data file definitions
 * Create subclass of tkinter button class to return values of selected data folder and number of files cued
-* Read list of files of selected type from the folder into a df
 --- Start of loop
     * Read in first file
     * Process data in first file
@@ -24,11 +10,9 @@ TODO
 --- End of loop
 * Write results df to file
 Known bugs
-    * FIXED: The number of files cued for analysis currently does not update when a data folder is chosen
-    * The displayed folder will cause the grid column to resize pushing the reset and quit buttons off the window
-        - This is alleviated with rowspan but need ot look at containers to place info and buttons separately
+
 ==========
-'''
+"""
 import glob
 import tkinter as tk
 from tkinter import filedialog as fd
@@ -45,39 +29,18 @@ import fnmatch
 from tkinter import *
 
 
-# from tkinter.messagebox import CANCEL, RETRY
-
-def quitscript():
+def quit_script():
     print("Leaving program")
-    mainwindow.destroy()
+    main_window.destroy()
     exit()
 
 
-# Read data file definition file
-# def get_file_defs():
-#     dataDefFile = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), "DataFileSpec.txt") # Set file to default location and name
-#     while not os.path.exists(dataDefFile):  # If the default file exists use it
-#         dataDefFile = fd.askopenfilename(
-#             title="Open data file definition file",
-#             filetypes=(("CSV files", "*.csv"), ("text files", "*.txt"), ("all files", "*.*"))
-#         )
-#         if len(dataDefFile) == 0: # no file selected or user clicked Cancel
-#             askRetry = messagebox.askretrycancel(title="Failed to read data file definitions",
-#                                    message="No data file specifications selected\nThis is required to proceed",
-#                                    default=RETRY)
-#             if not askRetry: # Cancel clicked- quit the program
-#                 return -1
-#             else:
-#                 dataDefFile=""
-#     # df = pd.read_csv(dataDefFile, header=1)
-#     arr = np.genfromtxt(dataDefFile, comments='#', names=True, dtype=None)
-#     return arr
-def get_file_defs():
-    datadeffile = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])),
-                               "DataFileSpec.txt")  # Set file to default location and name
-    if os.path.exists(datadeffile):  # If the default file exists
+def get_file_definitions():
+    # Set file to default location and name
+    data_def_file = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), "DataFileSpec.txt") 
+    if os.path.exists(data_def_file):  # If the default file exists
         arr = np.genfromtxt(
-            datadeffile,
+            data_def_file,
             comments='#',
             names=True,
             dtype=None
@@ -88,127 +51,136 @@ def get_file_defs():
         messagebox.showerror(
             title="Failed to read data file definitions",
             message="Aborting: No data file definitions found",
-            detail="Search path:\n" + datadeffile,
+            detail="Search path:\n" + data_def_file,
             icon='error'
         )
         return -1
 
 
-def getdatafolder(filetype):
+def data_filetype_selected(event):
+    file_type_label_gridinfo = choose_data_filetype_lbl.grid_info()   # Get grid info of existing label
+    # Remove selection combo and label
+    choose_data_filetype_lbl.grid_remove()
+    data_filetype_combo.grid_remove()
+    # Grid the label frame
+    data_filetype_frm.grid(
+        row=file_type_label_gridinfo['row'],
+        column=file_type_label_gridinfo['column'],
+        padx=pdx, pady=pdy
+    )
+    # Add details of what selected
+    data_filetype_lbl['text'] = filetype_list.get()
+    data_filetype_lbl.grid()
+    choose_data_fldr_btn['state'] = tk.NORMAL
+
+
+def get_data_folder(filetype):
     path = askdirectory(title='Select data Folder')  # shows dialog box and return the path
     if (len(path)) > 0:  # Cancel not clicked
-        filelist = glob.glob(os.path.join(path, "*." + filetype["file_type"][0]))
-        # Get button grid position and then remove it
-        button_grid_info = choosedatafolder_button.grid_info() # Get grid location of choosedatafolder_button
-        choosedatafolder_button.grid_remove() # Remove button
+        btn_grid_info = choose_data_fldr_btn.grid_info()  # Get grid location of choose data folder button
+        choose_data_fldr_btn.grid_remove()   # Remove choose data folder button
         # replace button with label
-        chosendatafolder_label['text'] = f"Selected data folder:\n {path}"
-        chosendatafolder_label.grid(
-            row=button_grid_info['row'],
-            column=button_grid_info['column'],
+        data_fldr_frm.grid(
+            row=btn_grid_info['row'],
+            column=btn_grid_info['column'],
             padx=pdx, pady=pdy,
-            columnspan = 4
+            columnspan=4
         )
-
+        # Add label for path
+        data_fldr_path_lbl['text'] = path
+        data_fldr_path_lbl.grid(row=0, column=0, padx=pdx, pady=pdy, columnspan=4)
         # count number of files in folder with the correct extension
-        ftype = filetype['file_type'][0]
-        fcount = 0
-        for file in os.listdir(path):
-            if file.endswith(ftype):
-                fcount += 1
+        f_type = filetype["file_type"][0]
+        filelist = glob.glob(os.path.join(path, "*." + f_type))
+        f_count = len(filelist)
         # make label visible and add text
-        filecue_label['text'] = f"{fcount} files with extension '{ftype}' found in selected folder"
-        filecue_label.grid(row=button_grid_info['row']+1, column=button_grid_info['column'], padx=pdx, pady=pdy, columnspan = 4)
-        if fcount > 0: # If some files were found, enable analysis
-            runanalysis_button['state'] = tk.NORMAL
-
-def datafiletype_selected(selected):
-    filetypelabel_gridinfo =choosedatafiletype_label.grid_info()
-    selecteddatafiletype_label.grid(row = filetypelabel_gridinfo['row'], column = filetypelabel_gridinfo['column']    )
-    choosedatafiletype_label.grid_remove()
-    datafiletype_combo.grid_remove()
-    selecteddatafiletype_label['text'] = 'Data file type selected: ' + filetypelist.get()
-    choosedatafolder_button['state'] = tk.NORMAL
+        file_cue_lbl['text'] = f"{f_count} files with extension '{f_type}' found"
+        file_cue_lbl.grid(row=1, column=0, padx=pdx, pady=pdy, columnspan=4)
+        if f_count > 0:  # If some files were found, enable analysis
+            run_analysis_btn['state'] = tk.NORMAL
 
 
 def run_analysis():
-    print("Run analysis: still need to do this!")
+    messagebox.showinfo(title="TO ADD", message="Run analysis not yet implemented")
+
 
 def reset_window():
     # reset choose data file type
-    choosedatafiletype_label.grid()
-    datafiletype_combo.grid()
-    selecteddatafiletype_label.grid_remove()
-    datafiletype_combo.set("")
+    choose_data_filetype_lbl.grid()
+    data_filetype_combo.grid()
+    data_filetype_frm.grid_remove()
+    data_filetype_lbl.grid_remove()
+    data_filetype_combo.set("")
 
     # reset data folder
-    chosendatafolder_label.grid_remove()
-    choosedatafolder_button.grid()
-    choosedatafolder_button['state'] = tk.DISABLED
-    filecue_label.grid_remove()
-
+    data_fldr_frm.grid_remove()
+    data_fldr_path_lbl.grid_remove()
+    choose_data_fldr_btn.grid()
+    choose_data_fldr_btn['state'] = tk.DISABLED
+    file_cue_lbl.grid_remove()
     # reset run analysis button
-    runanalysis_button['state'] = tk.DISABLED
+    run_analysis_btn['state'] = tk.DISABLED
+
 
 # === START OF MAINLOOP ===
 # create root window.
-mainwindow = Tk()
-mainwindow.geometry("450x200")
-mainwindow.title("Bulk file analyzer")
-
-pdx = 5;
-pdy = 5  # x, y padding for tkinter objects
+main_window = Tk()
+main_window.title("Bulk file analyzer")
+# x, y padding for tkinter objects
+pdx = 5
+pdy = 5
 
 # Get data file definitions
-dataFileDefs = get_file_defs()  # Read in data file specifications
-if type(dataFileDefs) == int:  # If script has returned an error code- exit
+data_file_definitions = get_file_definitions()  # Read in data file specifications
+if type(data_file_definitions) is int:  # If script has returned an error code: exit
     quitScript()
 
 # create choose data file type label
-choosedatafiletype_label = Label(mainwindow, text="Select data file type")
-choosedatafiletype_label.grid(row=0, column=1, padx=pdx, pady=pdy)
-# create chosen data file type label but don't label of place in grid yet
-selecteddatafiletype_label = Label(mainwindow)
+choose_data_filetype_lbl = Label(main_window, text="Select data file type")
+choose_data_filetype_lbl.grid(row=0, column=0, padx=pdx, pady=pdy, sticky=tk.W)
+# create chosen data file type labels but don't place in grid yet
+data_filetype_frm = LabelFrame(main_window, text='Data file type')
+data_filetype_lbl = Label(data_filetype_frm)
 
 # create combobox object to select data file type
-filetypelist = tk.StringVar()
-datafiletype_combo = ttk.Combobox(mainwindow, textvariable=filetypelist, state='readonly')
-datafiletype_combo['values'] = value = dataFileDefs['source'].tolist()  # convert to list to remove [] and ''
-datafiletype_combo['state'] = 'readonly'  # Prevent adding custom combobox values
-datafiletype_combo.bind('<<ComboboxSelected>>', datafiletype_selected)  # bind function for when value changed
-datafiletype_combo.grid(row=0, column=2, padx=pdx, pady=pdy)
+filetype_list = tk.StringVar()
+data_filetype_combo = ttk.Combobox(main_window, textvariable=filetype_list, state='readonly')
+data_filetype_combo['values'] = value = data_file_definitions['source'].tolist()  # convert to list to remove [] and ''
+data_filetype_combo['state'] = 'readonly'  # Prevent adding custom combobox values
+data_filetype_combo.bind('<<ComboboxSelected>>', data_filetype_selected)  # bind function for when value changed
+data_filetype_combo.grid(row=0, column=1, padx=pdx, pady=pdy, sticky=tk.W)
 
 # create choose folder containing data button
-choosedatafolder_button = ttk.Button(
-    mainwindow,
+choose_data_fldr_btn = ttk.Button(
+    main_window,
     text="Select data folder",
-    command=lambda: getdatafolder(dataFileDefs[dataFileDefs['source'] == filetypelist.get()]),
+    command=lambda: get_data_folder(data_file_definitions[data_file_definitions['source'] == filetype_list.get()]),
     state="disabled"
 )
-choosedatafolder_button.grid(row=2, column=1, padx=pdx, pady=pdy)
+choose_data_fldr_btn.grid(row=2, column=0, padx=pdx, pady=pdy, sticky=tk.W)
 
-# create label of data folder chosen but don't display it or add text yet
-chosendatafolder_label = Label(mainwindow)
-
-# create label of number of files cued but don't display it or add text yet
-filecue_label = Label(mainwindow)
+# create labels for data folder chosen and number of files cued but don't display yet
+data_fldr_frm = LabelFrame(main_window, text="Data folder")
+data_fldr_path_lbl = Label(data_fldr_frm)
+file_cue_lbl = Label(data_fldr_frm)
 
 # Create run analysis button
-runanalysis_button = ttk.Button(
-    mainwindow,
+run_analysis_btn = ttk.Button(
+    main_window,
     text="Run analysis",
     state="disabled",
-    command = run_analysis
+    command=run_analysis
 )
-runanalysis_button.grid(row=5, column=1, padx=pdx, pady=pdy)
-
-# Create quit script button
-quit_button = ttk.Button(mainwindow, text="Quit", command=lambda: quitscript())
-quit_button.grid(row=5, column=3, padx=pdx, pady=pdy)
 
 # Create reset button
-reset_button = ttk.Button(mainwindow, text="Reset", command=reset_window)
-reset_button.grid(row=5, column=2, padx=pdx, pady=pdy)
+reset_btn = ttk.Button(main_window, text="Reset", command=reset_window)
+reset_btn.grid(row=7, column=0, padx=pdx, pady=pdy)
+
+# Create quit script button
+quit_button = ttk.Button(main_window, text="Quit", command=quit_script)
+quit_button.grid(row=7, column=1, padx=pdx, pady=pdy)
+
+run_analysis_btn.grid(row=7, column=3, padx=pdx, pady=pdy)
 
 # Display until User exits themselves.
-mainwindow.mainloop()
+main_window.mainloop()
