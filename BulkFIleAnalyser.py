@@ -1,53 +1,48 @@
 """
 TODO
-    Look at changing source file definition file to csv. This would allow spaces in file type labels
+
     --- Start of loop
         * Read in first file
         * Process data in first file
         * Add results of processing to results df
     --- End of loop
     * Write results df to file
-    * Add validation to read of data file definitions
+
     * Remove everything other then generic file definition from DataFileSPec.txt file. The script should by default
     should read all columns guessing their type and using first row as header. Variation in that should be possible by
     custom settings within the analysis script
     Known bugs
     ==========
-    * Within SourceType.source_type_selected file_cue_info i.e. the class instance is referenced rather than self: This
-    is generating a 'method may be static' error
+    * If all files are removed from the edit window then the listbox will shrink to a very small size
     * BuildCue.edit_cue also giving 'method may be static' error as .self never used
-    * add_files is currently outside of the BuildCue class and therefore the list of cued files does not exist outside
-    of the function. It is not possible for the function to return a value as it is called from a callback function
     * See also Problems
 """
 import tkinter as tk
 from tkinter import filedialog as fd
 from tkinter import messagebox
 from tkinter import ttk
-import numpy as np
+from traceback import print_tb
+
+import pandas as pd
 import os
 import sys
 from tkinter import *
 
-
-def quit_script():
-    print("Leaving program")
-    root.destroy()
-    exit()
-
-
-def get_file_definitions():
+def get_file_definitions(def_cols):
     # Set file to default location and name
-    data_def_file = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), "DataFileSpec.txt") 
+    data_def_file = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), "DataFileSpec.csv")
     if os.path.exists(data_def_file):  # If the default file exists
-        arr = np.genfromtxt(
-            data_def_file,
-            comments='#',
-            names=True,
-            dtype=None
-            # dtype=['<U17', '<U3', '<U2', '<i8', '<i8', '<i8', '<i8', '<U6', '<U19']
-        )
-        return arr
+        arr = pd.read_csv(data_def_file, delimiter=",")  # Read it into a df
+        if arr.shape[0] >= 1 and arr.shape[1] == def_cols:  # Check at least 1 source type and correct number of columns read
+            return arr
+        else:
+            messagebox.showerror(
+                title="Failed to read data file definitions",
+                message="Aborting: Error in data file definitions found",
+                detail=f"Expected at least 1 row of {def_cols} columns\nGot {arr.shape[0]} rows of {arr.shape[1]}",
+                icon='error'
+            )
+            return -2
     else:
         messagebox.showerror(
             title="Failed to read data file definitions",
@@ -58,32 +53,38 @@ def get_file_definitions():
         return -1
 
 
-# class SourceType:
-
-
-class BuildCue:
-    def __init__(self, data_file_definitions):
+class BuildCue(tk.Frame):
+    def __init__(self, data_file_definitions, master=None, **kwargs):
+        super().__init__(master, **kwargs)
+    # def __init__(self, data_file_definitions):
         self.cued_file_count = 0  # Reset file counter
+        self.data_file_defs = data_file_definitions
+
+        # x, y padding for tkinter objects
+        pdx = 5
+        pdy = 5
+
+        # self.title("Bulk file analyzer")
 
         # create choose source data file type label
-        self.choose_data_source_type_lblfrm = LabelFrame(root, text="Select source data file type")
+        self.choose_data_source_type_lblfrm = LabelFrame(self, text="Select source data file type")
         self.choose_data_source_type_lblfrm.pack(padx=pdx, pady=pdy, side=tk.TOP, anchor=tk.NW)
 
         # create combobox object to select data file type
         defined_sources = tk.StringVar()
         self.source_type_combo = ttk.Combobox(self.choose_data_source_type_lblfrm, textvariable=defined_sources,
                                               state='readonly')
-        self.source_type_combo['values'] = data_file_definitions['source'].tolist()
+        self.source_type_combo['values'] = self.data_file_defs['source'].tolist()
         self.source_type_combo.set("Choose data file type")
         self.source_type_combo.pack(padx=pdx, pady=pdy)
         self.source_type_combo.bind('<<ComboboxSelected>>', self.source_type_selected)
 
         # create choose data file type label
-        choose_data_filetype_lblfrm = LabelFrame(root, text="Select data file type")
+        choose_data_filetype_lblfrm = LabelFrame(self, text="Select data file type")
         choose_data_filetype_lblfrm.pack(padx=pdx, pady=pdy, side=tk.TOP, anchor=tk.NW)
 
         # Create a frame for file cue widgets
-        data_files_lblfrm = LabelFrame(root, text="File cue")
+        data_files_lblfrm = LabelFrame(self, text="File cue")
         data_files_lblfrm.pack(padx=pdx, pady=pdy, side=tk.TOP, anchor=tk.NW)
 
         # Create a frame for build cue buttons
@@ -101,7 +102,7 @@ class BuildCue:
         self.edit_files_btn = ttk.Button(
             build_cue_btn_frm,
             text="View/ edit cue",
-            command=lambda: self.edit_cue(self.cued_file_list))
+            command=lambda: self.edit_cue_clicked(self.cued_file_list, pdx, pdy))
         self.edit_files_btn.pack(side=tk.LEFT, padx=pdx, pady=pdy)
 
         # Create label of files in cue
@@ -110,7 +111,7 @@ class BuildCue:
         self.cued_file_count_lbl.pack(padx=pdx, pady=pdy, side=tk.BOTTOM, anchor=tk.NW)
         self.update_cue_count_lbl()
 
-        main_btn_frame = tk.Frame(root, borderwidth=5, relief=tk.RAISED, bg='red', width=500)
+        main_btn_frame = tk.Frame(self, borderwidth=5, relief=tk.RAISED, bg='red', width=500)
         main_btn_frame.pack(side=tk.BOTTOM)
 
         # Create run analysis button
@@ -130,7 +131,7 @@ class BuildCue:
         reset_btn.pack(padx=pdx, pady=pdy, side=tk.LEFT)
 
         # Create quit script button
-        quit_btn = ttk.Button(main_btn_frame, text="Quit", command=quit_script)
+        quit_btn = ttk.Button(main_btn_frame, text="Quit", command=self.quit_script)
         quit_btn.pack(padx=pdx, pady=pdy, side=tk.LEFT)
 
         # Set window to initial conditions
@@ -138,21 +139,24 @@ class BuildCue:
 
     def source_type_selected(self, event):
         event.widget['state'] = tk.DISABLED  # Disable changing file type
-        file_cue_info.add_files_btn['state'] = tk.NORMAL
+        self.add_files_btn['state'] = tk.NORMAL
 
     def add_files_btn_clicked(self):
         # Get the source file type selected in the combo box
         selected_source_type = self.source_type_combo.get()
 
+        # Get the import settings for the selected source file type
+        self.file_import_settings = self.data_file_defs.loc[self.data_file_defs['source'] == selected_source_type]
+
         # Extract the matching file type and file type label
-        file_type = data_file_definitions[data_file_definitions['source'] == selected_source_type]['file_type'][0]
-        file_type_label = data_file_definitions[data_file_definitions['source'] == selected_source_type]['file_type_label'][0]
+        file_type = self.file_import_settings.at[1, 'file_type']
+        file_type_label = self.file_import_settings.at[1, 'file_type_label']
         self.add_files(file_type, file_type_label)
 
     def update_cue_count_lbl(self):
         self.cued_file_count_lbl.config(text=str(self.cued_file_count) + " files cued")
 
-    def edit_cue(self, cued_file_list):
+    def edit_cue_clicked(self, cued_file_list, pdx, pdy):
         # Create top level window
         self.file_cue_window = tk.Toplevel()
         self.file_cue_window.title('File cue')
@@ -195,13 +199,9 @@ class BuildCue:
         if selected_count == 0:
             messagebox.showinfo(title="no selection", message="No files selected")
         else:
-            remove_selected_ok = messagebox.askokcancel(
-                title="Remove selection",
-                message=f"{selected_count} files will be removed from cue")
-            if remove_selected_ok:  # User clicked OK
-                for item in files_selected:
-                    self.file_list_listbox.delete('active')
-                self.save_changes_btn['state'] = tk.NORMAL
+            for item in files_selected:
+                self.file_list_listbox.delete('active')
+            self.save_changes_btn['state'] = tk.NORMAL
 
     def save_changes_clicked(self):
         # Set cue list to only those values still in list box
@@ -259,32 +259,25 @@ class BuildCue:
         self.edit_files_btn['state'] = tk.DISABLED  # Disable view/ edit file cue button
         self.run_analysis_btn['state'] = tk.DISABLED  # Disable run analysis button
 
+    def quit_script(self):
+        print("Leaving program")
+        self.destroy()
+        exit()
 
-# def main():
-# create root window.
-root = Tk()
-root.title("Bulk file analyzer")
 
-# x, y padding for tkinter objects
-pdx = 5
-pdy = 5
+def main():
 
-# Get data file definitions
-data_file_definitions = get_file_definitions()  # Read in data file specifications
-if type(data_file_definitions) is int:  # If script has returned an error code: exit
-    quit_script()
+    # Get data file definitions
+    data_file_definitions = get_file_definitions(8)  # Read in data file specifications
+    if type(data_file_definitions) is pd.DataFrame:  # If script has returned a df rather than error code (integer)
+        # create root window.
+        root = tk.Tk()
+        window = BuildCue(data_file_definitions, root)
+        window.pack()
+        root.mainloop()
+    else:
+        quit_script()
 
-# Let user select source data file type
-# source_type_info = SourceType(data_file_definitions['source'].tolist())
 
-# Let user add files to analysis cue
-file_cue_info = BuildCue(data_file_definitions)
-
-# first_pass = True
-# if first_pass:  # Initialise the window
-#     first_pass = self.reset_window()
-
-root.mainloop()
-#
-# if __name__ == '__main__':
-#     main()
+if __name__ == '__main__':
+    main()
