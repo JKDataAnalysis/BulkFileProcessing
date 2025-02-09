@@ -239,7 +239,7 @@ class EditCue(tk.Toplevel):
 
         # Create listbox for cued files
         cue_list = tk.Variable(value=passed_file_list)
-        self.file_list_listbox = tk.Listbox(self, listvariable=cue_list, selectmode=EXTENDED, width=80, height = 20)
+        self.file_list_listbox = tk.Listbox(self, listvariable=cue_list, selectmode=EXTENDED, width=80, height=20)
         self.file_list_listbox.pack(padx=pdx, pady=pdy, expand=True, side=LEFT)
         # Add vertical scrollbar
         file_list_scrollbar = Scrollbar(self)
@@ -289,8 +289,8 @@ class EditCue(tk.Toplevel):
         if selected_count == 0:
             messagebox.showinfo(title="no selection", message="No files selected")
         else:
-            for item in files_selected:
-                self.file_list_listbox.delete('active')
+            for index in files_selected[::-1]: # Start from last item selected so that indicies aren't changed
+                self.file_list_listbox.delete(index)
             self.save_changes_btn['state'] = tk.NORMAL
             # if self.file_list_listbox.size() == 0: # No items left
             #     self.file_list_listbox.config['width'] = 20
