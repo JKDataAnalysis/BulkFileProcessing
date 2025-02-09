@@ -1,19 +1,27 @@
 """
 TODO
-
+    =====
+    Major
+    =====
+    * Create window to run analysis- just show progress bar and label
+        - Once complete show options for results- save as / view
     --- Start of loop
         * Read in first file
         * Process data in first file
         * Add results of processing to results df
     --- End of loop
     * Write results df to file
-
-    * Remove everything other then generic file definition from DataFileSPec.txt file. The script should by default
-    should read all columns guessing their type and using first row as header. Variation in that should be possible by
-    custom settings within the analysis script
+    =====
+    Minor
+    =====
+    * The width of the listbox in EditCue is set to a fixed value. This will stop it from shrinking to a really small
+     size if all files are removed but path lengths could be longer than this. Think of a better way to handle this.
+    * padx and pady values are currently set within the classes rather than being passed to them
+    * Vertical scroll bar on edit files listbox should only display if the number of files displayed is greater than the
+     listbox height
+    ==========
     Known bugs
     ==========
-    * If all files are removed from the edit window then the listbox will shrink to a very small size
     * BuildCue.edit_cue also giving 'method may be static' error as .self never used
     * See also Problems
 """
@@ -21,12 +29,12 @@ import tkinter as tk
 from tkinter import filedialog as fd
 from tkinter import messagebox
 from tkinter import ttk
-from traceback import print_tb
 
 import pandas as pd
 import os
 import sys
 from tkinter import *
+
 
 def get_file_definitions(def_cols):
     # Set file to default location and name
@@ -64,8 +72,6 @@ class BuildCue(tk.Frame):
         pdx = 5
         pdy = 5
 
-        # self.title("Bulk file analyzer")
-
         # create choose source data file type label
         self.choose_data_source_type_lblfrm = LabelFrame(self, text="Select source data file type")
         self.choose_data_source_type_lblfrm.pack(padx=pdx, pady=pdy, side=tk.TOP, anchor=tk.NW)
@@ -102,7 +108,7 @@ class BuildCue(tk.Frame):
         self.edit_files_btn = ttk.Button(
             build_cue_btn_frm,
             text="View/ edit cue",
-            command=lambda: self.edit_cue_clicked(self.cued_file_list, pdx, pdy))
+            command=self.edit_cue_clicked)
         self.edit_files_btn.pack(side=tk.LEFT, padx=pdx, pady=pdy)
 
         # Create label of files in cue
@@ -147,72 +153,14 @@ class BuildCue(tk.Frame):
 
         # Get the import settings for the selected source file type
         self.file_import_settings = self.data_file_defs.loc[self.data_file_defs['source'] == selected_source_type]
+        # Flatten to a pandas series
+        self.file_import_settings = self.file_import_settings.squeeze()
 
         # Extract the matching file type and file type label
-        file_type = self.file_import_settings.at[1, 'file_type']
-        file_type_label = self.file_import_settings.at[1, 'file_type_label']
+        file_type = self.file_import_settings['file_type']
+        file_type_label = self.file_import_settings['file_type_label']
         self.add_files(file_type, file_type_label)
 
-    def update_cue_count_lbl(self):
-        self.cued_file_count_lbl.config(text=str(self.cued_file_count) + " files cued")
-
-    def edit_cue_clicked(self, cued_file_list, pdx, pdy):
-        # Create top level window
-        self.file_cue_window = tk.Toplevel()
-        self.file_cue_window.title('File cue')
-
-        # Create listbox for cued files
-        cue_list = tk.Variable(value=cued_file_list)
-        self.file_list_listbox = tk.Listbox(self.file_cue_window, listvariable=cue_list, selectmode=EXTENDED, width=0)
-        self.file_list_listbox.pack(padx=pdx, pady=pdy, expand=True, fill=tk.BOTH, side=LEFT)
-
-        # Create frame for buttons
-        edit_btn_frame = Frame(self.file_cue_window)
-        edit_btn_frame.pack(side=tk.RIGHT, anchor=NE)
-
-        # Create a button to remove selected files
-        remove_selected_btn = ttk.Button(
-            edit_btn_frame,
-            text="Remove selected",
-            command=self.remove_selected_clicked
-        )
-        remove_selected_btn.pack(padx=pdx, pady=pdy, side=TOP)
-
-        # Create a button to save changes to list
-        self.save_changes_btn = ttk.Button(
-            edit_btn_frame,
-            text="Save changes",
-            command=self.save_changes_clicked,
-            state=tk.DISABLED)
-        self.save_changes_btn.pack(padx=pdx, pady=pdy, side=TOP)
-
-        # Create a button to close (destroy) this window.
-        close_btn = ttk.Button(
-            edit_btn_frame,
-            text="Close",
-            command=self.file_cue_window.destroy)
-        close_btn.pack(padx=pdx, pady=pdy, side=TOP)
-
-    def remove_selected_clicked(self):
-        files_selected = self.file_list_listbox.curselection()
-        selected_count = len(files_selected)
-        if selected_count == 0:
-            messagebox.showinfo(title="no selection", message="No files selected")
-        else:
-            for item in files_selected:
-                self.file_list_listbox.delete('active')
-            self.save_changes_btn['state'] = tk.NORMAL
-
-    def save_changes_clicked(self):
-        # Set cue list to only those values still in list box
-        self.cued_file_list = self.file_list_listbox.get(0, END)  # Get all the files still in tuple
-        self.cued_file_count = len(self.cued_file_list)  # Update file count
-        self.update_cue_count_lbl()  # Update file count label
-        if self.cued_file_count == 0:  # If all files have been removed from cue, remove unavailable options
-            self.run_analysis_btn['state'] = tk.DISABLED
-            self.edit_files_btn['state'] = tk.DISABLED
-        self.file_cue_window.destroy()  # Close the window
-                
     def add_files(self, file_type, file_type_label):
         filetypes = (
             (file_type_label, "*." + file_type),
@@ -236,7 +184,8 @@ class BuildCue(tk.Frame):
         msg_text = str(self.cued_file_count - duplicate_count) + " files added to cue"
         if duplicate_count > 0:
             msg_title = "Duplicates found"
-            msg_text += "\n" + str(duplicate_count) + " file(s) found that are already cued\nThese will not be added"
+            msg_text += "\n" + str(
+                duplicate_count) + " file(s) found that are already cued\nThese will not be added"
         else:
             msg_title = "Files added"
         messagebox.showinfo(title=msg_title, message=msg_text)
@@ -259,10 +208,98 @@ class BuildCue(tk.Frame):
         self.edit_files_btn['state'] = tk.DISABLED  # Disable view/ edit file cue button
         self.run_analysis_btn['state'] = tk.DISABLED  # Disable run analysis button
 
+    def edit_cue_clicked(self):
+        # self.file_cue_window.title('File cue')
+        edited_file_list = EditCue(self.cued_file_list, self)  # Create pop-up for editing list
+        if edited_file_list.saved_changes:  # Changes have been made and saved
+            self.cued_file_list = edited_file_list.returned_file_list  # Update file cue
+            self.cued_file_count = len(self.cued_file_list)  # Update file count
+            self.update_cue_count_lbl()  # Update file count label
+            if self.cued_file_count == 0:  # If all files have been removed from cue, remove unavailable options
+                self.run_analysis_btn['state'] = tk.DISABLED  # Disable run analysis button
+                self.edit_files_btn['state'] = tk.DISABLED
+
+    def update_cue_count_lbl(self):
+        self.cued_file_count_lbl.config(text=str(self.cued_file_count) + " files cued")
+
     def quit_script(self):
         print("Leaving program")
         self.destroy()
         exit()
+
+
+class EditCue(tk.Toplevel):
+    """modal window requires a master"""
+    def __init__(self, passed_file_list, master, **kwargs):
+        super().__init__(master, **kwargs)
+
+        # x, y padding for tkinter objects
+        pdx = 5
+        pdy = 5
+
+        # Create listbox for cued files
+        cue_list = tk.Variable(value=passed_file_list)
+        self.file_list_listbox = tk.Listbox(self, listvariable=cue_list, selectmode=EXTENDED, width=80, height = 20)
+        self.file_list_listbox.pack(padx=pdx, pady=pdy, expand=True, side=LEFT)
+        # Add vertical scrollbar
+        file_list_scrollbar = Scrollbar(self)
+        file_list_scrollbar.pack(side=LEFT, fill=BOTH)
+        self.file_list_listbox.config(yscrollcommand=file_list_scrollbar.set)
+        file_list_scrollbar.config(command=self.file_list_listbox.yview)
+
+        # Create frame for buttons
+        edit_btn_frame = Frame(self)
+        edit_btn_frame.pack(side=tk.RIGHT, anchor=NE)
+
+        # Create a button to remove selected files
+        remove_selected_btn = ttk.Button(
+            edit_btn_frame,
+            text="Remove selected",
+            command=self.remove_selected_clicked
+        )
+        remove_selected_btn.pack(padx=pdx, pady=pdy, side=TOP)
+
+        # Create a button to save changes to list
+        self.save_changes_btn = ttk.Button(
+            edit_btn_frame,
+            text="Save changes",
+            command=self.save_changes_clicked,
+            state=tk.DISABLED)
+        self.save_changes_btn.pack(padx=pdx, pady=pdy, side=TOP)
+
+        # Create a button to close (destroy) this window.
+        close_btn = ttk.Button(
+            edit_btn_frame,
+            text="Close",
+            command=self.close_clicked)
+        close_btn.pack(padx=pdx, pady=pdy, side=TOP)
+
+        # The following commands keep the popup on top and stop clicking on the main window during editing
+        self.transient(master)  # set to be on top of the main window
+        self.grab_set()  # hijack all commands from the master (clicks on the main window are ignored)
+        master.wait_window(self)  # pause anything on the main window until this one closes
+
+    def close_clicked(self):
+        self.saved_changes = False  # Flag no changes made
+        self.destroy()
+
+    def remove_selected_clicked(self):
+        files_selected = self.file_list_listbox.curselection()
+        selected_count = len(files_selected)
+        if selected_count == 0:
+            messagebox.showinfo(title="no selection", message="No files selected")
+        else:
+            for item in files_selected:
+                self.file_list_listbox.delete('active')
+            self.save_changes_btn['state'] = tk.NORMAL
+            # if self.file_list_listbox.size() == 0: # No items left
+            #     self.file_list_listbox.config['width'] = 20
+
+    def save_changes_clicked(self):
+        # Set cue list to only those values still in list box
+        self.returned_file_list = self.file_list_listbox.get(0, END)  # Get all the files still in tuple
+        self.saved_changes = True
+        self.destroy()  # Close the window
 
 
 def main():
@@ -272,11 +309,12 @@ def main():
     if type(data_file_definitions) is pd.DataFrame:  # If script has returned a df rather than error code (integer)
         # create root window.
         root = tk.Tk()
+        root.title("Bulk file analyser")
         window = BuildCue(data_file_definitions, root)
         window.pack()
         root.mainloop()
     else:
-        quit_script()
+        exit()
 
 
 if __name__ == '__main__':
