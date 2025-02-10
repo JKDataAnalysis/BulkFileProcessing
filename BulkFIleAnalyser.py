@@ -20,9 +20,8 @@ TODO
     ==========
     Known bugs
     ==========
-    * BuildCue.edit_cue also giving 'method may be static' error as .self never used
-    * See also Problems
 """
+
 import tkinter as tk
 from tkinter import filedialog as fd
 from tkinter import messagebox
@@ -63,6 +62,8 @@ class BuildCue(tk.Frame):
     def __init__(self, data_file_definitions, master=None, **kwargs):
         super().__init__(master, **kwargs)
     # def __init__(self, data_file_definitions):
+        self.file_import_settings = None
+        self.cued_file_list = None
         self.cued_file_count = 0  # Reset file counter
         self.data_file_defs = data_file_definitions
 
@@ -229,6 +230,9 @@ class EditCue(tk.Toplevel):
     def __init__(self, passed_file_list, master, **kwargs):
         super().__init__(master, **kwargs)
 
+        self.saved_changes = None
+        self.returned_file_list = None
+
         # x, y padding for tkinter objects
         pdx = 5
         pdy = 5
@@ -290,7 +294,7 @@ class EditCue(tk.Toplevel):
 
     def remove_selected_clicked(self):
         files_selected = self.file_list_listbox.curselection()
-        for index in files_selected[::-1]: # Start from last item selected so that indicies aren't changed
+        for index in files_selected[::-1]:  # Start from last item selected so that indicies aren't changed
             self.file_list_listbox.delete(index)
         self.save_changes_btn['state'] = tk.NORMAL  # Enable saving changes
         self.remove_selected_btn['state'] = tk.DISABLED  # Disable removing selected (they're already gone)
@@ -304,18 +308,17 @@ class EditCue(tk.Toplevel):
             self.remove_selected_btn['state'] = tk.DISABLED  # Disable remove selected button
             self.file_list_scrollbar.pack_forget()  # Hide the scrollbar
 
-
     def save_changes_clicked(self):
         # Set cue list to only those values still in list box
         self.returned_file_list = self.file_list_listbox.get(0, END)  # Get all the files still in tuple
         self.saved_changes = True
         self.destroy()  # Close the window
 
+
 class RunAnalysis(tk.Toplevel):
     """modal window requires a master"""
     def __init__(self, passed_file_list, master, **kwargs):
         super().__init__(master, **kwargs)
-
 
         # The following commands keep the popup on top and stop clicking on the main window during editing
         self.transient(master)  # set to be on top of the main window
