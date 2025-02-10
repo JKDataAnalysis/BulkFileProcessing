@@ -14,8 +14,6 @@ TODO
     =====
     Minor
     =====
-    * The width of the listbox in EditCue is set to a fixed value. This will stop it from shrinking to a really small
-     size if all files are removed but path lengths could be longer than this. Think of a better way to handle this.
     * padx and pady values are currently set within the classes rather than being passed to them
     * Vertical scroll bar on edit files listbox should only display if the number of files displayed is greater than the
      listbox height
@@ -112,22 +110,12 @@ class BuildCue(tk.Frame):
         self.edit_files_btn.pack(side=tk.LEFT, padx=pdx, pady=pdy)
 
         # Create label of files in cue
-        cued_file_count = 0
         self.cued_file_count_lbl = Label(data_files_lblfrm)
         self.cued_file_count_lbl.pack(padx=pdx, pady=pdy, side=tk.BOTTOM, anchor=tk.NW)
         self.update_cue_count_lbl()
 
-        main_btn_frame = tk.Frame(self, borderwidth=5, relief=tk.RAISED, bg='red', width=500)
+        main_btn_frame = tk.Frame(self)
         main_btn_frame.pack(side=tk.BOTTOM)
-
-        # Create run analysis button
-        self.run_analysis_btn = ttk.Button(
-            main_btn_frame,
-            text="Run analysis",
-            state="disabled",
-            command=self.run_analysis
-        )
-        self.run_analysis_btn.pack(padx=pdx, pady=pdy, side=tk.LEFT)
 
         # Create reset button
         reset_btn = ttk.Button(
@@ -139,6 +127,14 @@ class BuildCue(tk.Frame):
         # Create quit script button
         quit_btn = ttk.Button(main_btn_frame, text="Quit", command=self.quit_script)
         quit_btn.pack(padx=pdx, pady=pdy, side=tk.LEFT)
+
+        # Create run analysis button
+        self.run_analysis_btn = ttk.Button(
+            main_btn_frame,
+            text="Run analysis",
+            state="disabled",
+            command=self.run_analysis)
+        self.run_analysis_btn.pack(padx=pdx, pady=pdy, side=tk.LEFT)
 
         # Set window to initial conditions
         self.reset_window()
@@ -239,25 +235,27 @@ class EditCue(tk.Toplevel):
 
         # Create listbox for cued files
         cue_list = tk.Variable(value=passed_file_list)
-        self.file_list_listbox = tk.Listbox(self, listvariable=cue_list, selectmode=EXTENDED, width=80, height=20)
+        self.file_list_listbox = tk.Listbox(self, listvariable=cue_list, selectmode=EXTENDED, width=0, height=20)
         self.file_list_listbox.pack(padx=pdx, pady=pdy, expand=True, side=LEFT)
+        self.file_list_listbox.bind('<<ListboxSelect>>', self.list_item_selected)
+
         # Add vertical scrollbar
-        file_list_scrollbar = Scrollbar(self)
-        file_list_scrollbar.pack(side=LEFT, fill=BOTH)
-        self.file_list_listbox.config(yscrollcommand=file_list_scrollbar.set)
-        file_list_scrollbar.config(command=self.file_list_listbox.yview)
+        self.file_list_scrollbar = Scrollbar(self)
+        self.file_list_scrollbar.pack(side=LEFT, fill=BOTH)
+        self.file_list_listbox.config(yscrollcommand=self.file_list_scrollbar.set)
+        self.file_list_scrollbar.config(command=self.file_list_listbox.yview)
 
         # Create frame for buttons
         edit_btn_frame = Frame(self)
         edit_btn_frame.pack(side=tk.RIGHT, anchor=NE)
 
         # Create a button to remove selected files
-        remove_selected_btn = ttk.Button(
+        self.remove_selected_btn = ttk.Button(
             edit_btn_frame,
             text="Remove selected",
-            command=self.remove_selected_clicked
-        )
-        remove_selected_btn.pack(padx=pdx, pady=pdy, side=TOP)
+            command=self.remove_selected_clicked,
+            state=tk.DISABLED)  # Start with button disabled until files are selected
+        self.remove_selected_btn.pack(padx=pdx, pady=pdy, side=TOP)
 
         # Create a button to save changes to list
         self.save_changes_btn = ttk.Button(
@@ -270,7 +268,7 @@ class EditCue(tk.Toplevel):
         # Create a button to close (destroy) this window.
         close_btn = ttk.Button(
             edit_btn_frame,
-            text="Close",
+            text="Cancel",
             command=self.close_clicked)
         close_btn.pack(padx=pdx, pady=pdy, side=TOP)
 
@@ -279,27 +277,50 @@ class EditCue(tk.Toplevel):
         self.grab_set()  # hijack all commands from the master (clicks on the main window are ignored)
         master.wait_window(self)  # pause anything on the main window until this one closes
 
+    def list_item_selected(self, event):
+        selected = event.widget.curselection()
+        if len(selected) > 0:
+            self.remove_selected_btn['state'] = tk.NORMAL
+        else:
+            self.remove_selected_btn['state'] = tk.DISABLED
+
     def close_clicked(self):
         self.saved_changes = False  # Flag no changes made
         self.destroy()
 
     def remove_selected_clicked(self):
         files_selected = self.file_list_listbox.curselection()
-        selected_count = len(files_selected)
-        if selected_count == 0:
-            messagebox.showinfo(title="no selection", message="No files selected")
-        else:
-            for index in files_selected[::-1]: # Start from last item selected so that indicies aren't changed
-                self.file_list_listbox.delete(index)
-            self.save_changes_btn['state'] = tk.NORMAL
-            # if self.file_list_listbox.size() == 0: # No items left
-            #     self.file_list_listbox.config['width'] = 20
+        for index in files_selected[::-1]: # Start from last item selected so that indicies aren't changed
+            self.file_list_listbox.delete(index)
+        self.save_changes_btn['state'] = tk.NORMAL  # Enable saving changes
+        self.remove_selected_btn['state'] = tk.DISABLED  # Disable removing selected (they're already gone)
+
+        # If all files are removed, add note of this to listbox and disable it
+        if self.file_list_listbox.size() == 0:
+            self.file_list_listbox.pack_forget()  # Hide the listbox
+            # Create temporary label to replace listbox with
+            temp_label = Label(self, text=">>> All files removed <<<", borderwidth=3, relief="groove", bg='white')
+            temp_label.pack(ipadx=50, ipady=50, expand=True, side=LEFT)
+            self.remove_selected_btn['state'] = tk.DISABLED  # Disable remove selected button
+            self.file_list_scrollbar.pack_forget()  # Hide the scrollbar
+
 
     def save_changes_clicked(self):
         # Set cue list to only those values still in list box
         self.returned_file_list = self.file_list_listbox.get(0, END)  # Get all the files still in tuple
         self.saved_changes = True
         self.destroy()  # Close the window
+
+class RunAnalysis(tk.Toplevel):
+    """modal window requires a master"""
+    def __init__(self, passed_file_list, master, **kwargs):
+        super().__init__(master, **kwargs)
+
+
+        # The following commands keep the popup on top and stop clicking on the main window during editing
+        self.transient(master)  # set to be on top of the main window
+        self.grab_set()  # hijack all commands from the master (clicks on the main window are ignored)
+        master.wait_window(self)  # pause anything on the main window until this one closes
 
 
 def main():
