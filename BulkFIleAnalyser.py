@@ -17,6 +17,7 @@ TODO
     * padx and pady values are currently set within the classes rather than being passed to them
     * Vertical scroll bar on edit files listbox should only display if the number of files displayed is greater than the
      listbox height
+    * default_dir to start looking for data files is temporarily set to location of tekscan test data
     ==========
     Known bugs
     ==========
@@ -31,6 +32,8 @@ import pandas as pd
 import os
 import sys
 from tkinter import *
+
+import numpy as np
 
 
 def get_file_definitions(def_cols):
@@ -134,7 +137,7 @@ class BuildCue(tk.Frame):
             main_btn_frame,
             text="Run analysis",
             state="disabled",
-            command=self.run_analysis)
+            command=self.run_analysis_clicked)
         self.run_analysis_btn.pack(padx=pdx, pady=pdy, side=tk.LEFT)
 
         # Set window to initial conditions
@@ -163,9 +166,10 @@ class BuildCue(tk.Frame):
             (file_type_label, "*." + file_type),
             ('All files (may not be compatible)', '*.*')
         )
+        default_dir = '/home/jon/Documents/TestData/RecentData'
         selected_file_list = fd.askopenfilenames(
             title='Open files',
-            # initialdir='/',
+            initialdir=default_dir,
             filetypes=filetypes
         )
         if not type(selected_file_list) is tuple:  # Will be tuple unless user clicked cancel
@@ -193,8 +197,8 @@ class BuildCue(tk.Frame):
             self.edit_files_btn['state'] = tk.NORMAL
         self.update_cue_count_lbl()
 
-    def run_analysis(self):
-        messagebox.showinfo(title="TO ADD", message="Run analysis not yet implemented")
+    def run_analysis_clicked(self):
+        results_df = RunAnalysis(self.cued_file_list, self.file_import_settings, self)
 
     def reset_window(self):
         self.cued_file_list = tuple()  # Clear the file cue
@@ -317,13 +321,64 @@ class EditCue(tk.Toplevel):
 
 class RunAnalysis(tk.Toplevel):
     """modal window requires a master"""
-    def __init__(self, passed_file_list, master, **kwargs):
+    def __init__(self, passed_file_list, file_import_settings, master, **kwargs):
         super().__init__(master, **kwargs)
+
+        # x, y padding for tkinter objects
+        pdx = 5
+        pdy = 5
+
+        # Create a temprary label- replace this with meaningful feedback
+        temp_lbl = Label(self, text="Add feedback on progress here")
+        temp_lbl.pack(padx=pdx, pady=pdy)
+
+        # Create a button to close the window when analysis is complete
+        close_btn = Button(self, text="Close", command=self.analysis_complete, state=tk.DISABLED)
+        close_btn.pack(padx=pdx, pady=pdy)
+
+        for file in passed_file_list:
+            self.read_data_file(file, file_import_settings)
+
+        close_btn['state'] = tk.NORMAL
 
         # The following commands keep the popup on top and stop clicking on the main window during editing
         self.transient(master)  # set to be on top of the main window
         self.grab_set()  # hijack all commands from the master (clicks on the main window are ignored)
         master.wait_window(self)  # pause anything on the main window until this one closes
+
+    def read_data_file(self, file, import_settings):
+        if os.path.exists(file):  # If the file exists
+            df = pd.read_csv(
+                file,
+                sep=import_settings['delim'],
+                skiprows=import_settings['skip'],
+                dtype={'Time': float, 'Frame': int, 'X': float, 'Y': float},
+                # index_col='Frame',
+                converters={'Time': self.custom_converter}
+
+                # engine='pyarrow',
+                # skipfooter=4
+            )
+            print(df.dtypes)
+            if type(df) != pd.DataFrame:
+                return "Could not read file"
+            else:
+                return df
+        else:
+            return "File not found"
+
+    def analysis_complete(self):
+        # Blows up with destroy if called directly from __init__ but not from a button command. Need to figure out why
+        self.destroy()  # Finished with window, close it
+
+
+    def custom_converter(self, val):
+        if not val:
+            return 0
+        try:
+            return np.float64(val)
+        except:
+            return np.float64(0)
 
 
 def main():
