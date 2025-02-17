@@ -1,5 +1,11 @@
 """
 TODO
+    ====================
+    Questions to resolve
+    ====================
+    * Is it possible to pass a variable number of parameters to pd.read_csv so that not all possible import parameters
+    need to be set in the import settings file?
+    * How to read dtype (key value pairs) from csv file?
     =====
     Major
     =====
@@ -21,6 +27,14 @@ TODO
     ==========
     Known bugs
     ==========
+    * Can't set both nrows and skipfooter in pd.read_csv. How can either of those options be given to users without
+    causing (or just supressing) errors? Have standard read in this file and custon in AnalysisTemplate file with a flag
+    (use_custom_file_read) set in the Analysis Template?
+    * Some of the Tekscan data files have more than 1 data set in them. This will results in rows containing text in
+    rows that are defined as numeric types. Can these be identified and modified by a function prior to reading or is
+    there a way to stop reading on blank rows?
+    * Look at using a custom converter on pd.read_csv to return empty rows and junk at the bottom of the data as NA.
+    Then use df.dropna(inplace = True) to remove them. This needs to be an option in the import settings
 """
 
 import tkinter as tk
@@ -35,19 +49,22 @@ from tkinter import *
 
 import numpy as np
 
+# import AnalysisTemplate
+# from AnalysisTemplate import external_read_info
 
-def get_file_definitions(def_cols):
+
+def get_file_definitions(expected_no_def_cols):
     # Set file to default location and name
     data_def_file = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), "DataFileSpec.csv")
     if os.path.exists(data_def_file):  # If the default file exists
         arr = pd.read_csv(data_def_file, delimiter=",")  # Read it into a df
-        if arr.shape[0] >= 1 and arr.shape[1] == def_cols:  # Check at least 1 source type and correct number of columns read
+        if arr.shape[0] >= 1 and arr.shape[1] == expected_no_def_cols:  # Check at least 1 source type and correct number of columns read
             return arr
         else:
             messagebox.showerror(
                 title="Failed to read data file definitions",
                 message="Aborting: Error in data file definitions found",
-                detail=f"Expected at least 1 row of {def_cols} columns\nGot {arr.shape[0]} rows of {arr.shape[1]}",
+                detail=f"Expected at least 1 row of {expected_no_def_cols} columns\nGot {arr.shape[0]} rows of {arr.shape[1]}",
                 icon='error'
             )
             return -2
@@ -328,7 +345,7 @@ class RunAnalysis(tk.Toplevel):
         pdx = 5
         pdy = 5
 
-        # Create a temprary label- replace this with meaningful feedback
+        # Create a temporary label- replace this with meaningful feedback
         temp_lbl = Label(self, text="Add feedback on progress here")
         temp_lbl.pack(padx=pdx, pady=pdy)
 
@@ -337,7 +354,7 @@ class RunAnalysis(tk.Toplevel):
         close_btn.pack(padx=pdx, pady=pdy)
 
         for file in passed_file_list:
-            self.read_data_file(file, file_import_settings)
+            df = self.read_data_file(file, file_import_settings)
 
         close_btn['state'] = tk.NORMAL
 
@@ -353,17 +370,14 @@ class RunAnalysis(tk.Toplevel):
                 sep=import_settings['delim'],
                 skiprows=import_settings['skip'],
                 dtype={'Time': float, 'Frame': int, 'X': float, 'Y': float},
-                # index_col='Frame',
-                converters={'Time': self.custom_converter}
-
-                # engine='pyarrow',
-                # skipfooter=4
+                engine=import_settings['engine'],
+                skipfooter=import_settings['skipfooter']
             )
-            print(df.dtypes)
-            if type(df) != pd.DataFrame:
-                return "Could not read file"
-            else:
+            print(file, "\n", df.dtypes, "\nShape: ", df.shape, "\n", df.tail(10))
+            if df is pd.DataFrame:
                 return df
+            else:
+                return "Could not read file"
         else:
             return "File not found"
 
@@ -372,19 +386,11 @@ class RunAnalysis(tk.Toplevel):
         self.destroy()  # Finished with window, close it
 
 
-    def custom_converter(self, val):
-        if not val:
-            return 0
-        try:
-            return np.float64(val)
-        except:
-            return np.float64(0)
-
-
 def main():
+    # print("Use custom file read = ", AnalysisTemplate.use_custom_file_read)
 
     # Get data file definitions
-    data_file_definitions = get_file_definitions(8)  # Read in data file specifications
+    data_file_definitions = get_file_definitions(11)  # Read in data file specifications (number of expected columns)
     if type(data_file_definitions) is pd.DataFrame:  # If script has returned a df rather than error code (integer)
         # create root window.
         root = tk.Tk()

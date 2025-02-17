@@ -1,3 +1,3 @@
-source,file_type,file_type_label,delim,maxn,skip,sr_skp,sr_colm
-Tekscan Footscan,csv,Tekscan SAM,",",1000,8,5,2
-Kistler Bioware,txt,Bioware,\t,-1,19,3,3
+source,file_type,file_type_label,delim,maxn,skip,engine,skipfooter,dtype,sr_skp,sr_colm
+Tekscan Footscan,csv,Tekscan SAM,",",,8,python,4,,5,2
+Kistler Bioware,txt,Bioware,\t,0,19,c,0,,3,3
