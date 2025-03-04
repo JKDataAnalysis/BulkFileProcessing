@@ -6,13 +6,16 @@ TODO
     * Is it possible to pass a variable number of parameters to pd.read_csv so that not all possible import parameters
     need to be set in the import settings file?
     * How to read dtype (key value pairs) from csv file?
+    * Can't set both nrows and skipfooter in pd.read_csv. How can either of those options be given to users without
+    causing (or just supressing) errors? Have standard read in this file and custom in AnalysisTemplate file with a flag
+    (use_custom_file_read) set in the Analysis Template?
     =====
     Major
     =====
     * Create window to run analysis- just show progress bar and label
         - Once complete show options for results- save as / view
     --- Start of loop
-        * Read in first file
+        * Read in file
         * Process data in first file
         * Add results of processing to results df
     --- End of loop
@@ -23,31 +26,31 @@ TODO
     * padx and pady values are currently set within the classes rather than being passed to them
     * Vertical scroll bar on edit files listbox should only display if the number of files displayed is greater than the
      listbox height
-    * default_dir to start looking for data files is temporarily set to location of tekscan test data
+    * default_dir to start looking for data files is temporarily set to location of tekscan test data. This should be
+    the last used folder
     ==========
     Known bugs
     ==========
-    * Can't set both nrows and skipfooter in pd.read_csv. How can either of those options be given to users without
-    causing (or just supressing) errors? Have standard read in this file and custon in AnalysisTemplate file with a flag
-    (use_custom_file_read) set in the Analysis Template?
     * Some of the Tekscan data files have more than 1 data set in them. This will results in rows containing text in
-    rows that are defined as numeric types. Can these be identified and modified by a function prior to reading or is
-    there a way to stop reading on blank rows?
-    * Look at using a custom converter on pd.read_csv to return empty rows and junk at the bottom of the data as NA.
-    Then use df.dropna(inplace = True) to remove them. This needs to be an option in the import settings
+    rows that are defined as numeric types. A utility could be quite easily written to identify and correct these but,
+    given that I'm not likely to be using Tekscan data any time soon, this probably doesn't need to be done and
+    certainly not as part of this script. Do need to make the script more robust in handling such errors though as they
+    could be encountered in other files
 """
 
 import tkinter as tk
 from tkinter import filedialog as fd
 from tkinter import messagebox
 from tkinter import ttk
+from xml.etree.ElementInclude import include
 
 import pandas as pd
 import os
 import sys
 from tkinter import *
+import glob
 
-import numpy as np
+# import numpy as np
 
 # import AnalysisTemplate
 # from AnalysisTemplate import external_read_info
@@ -119,9 +122,25 @@ class BuildCue(tk.Frame):
         # create button to add files
         self.add_files_btn = ttk.Button(
             build_cue_btn_frm,
-            text="Add files",
-            command=self.add_files_btn_clicked)
+            text="Select files",
+        command=lambda: self.add_files_btns_clicked("files"))
         self.add_files_btn.pack(padx=pdx, pady=pdy, side=tk.LEFT, anchor=tk.NW)
+
+        # Create button to add folder
+        self.add_folder_btn = ttk.Button(
+            build_cue_btn_frm,
+            text="Add ALL files in folder",
+            command=lambda: self.add_files_btns_clicked("folder"))
+        # self.add_folder_btn.bind("<Button-1>", lambda x: self.add_files_btns_clicked("folder"))
+        self.add_folder_btn.pack(padx=pdx, pady=pdy, side=tk.LEFT, anchor=tk.NW)
+
+        # Create checkbox to include subfolders
+        self.include_subs = tk.BooleanVar()
+        self.include_subdir_chk = ttk.Checkbutton(
+            build_cue_btn_frm,
+            text="Include\nsubfolders",
+            variable=self.include_subs)
+        self.include_subdir_chk.pack(padx=pdx, pady=pdy, side=tk.LEFT, anchor=tk.NW)
 
         # create button to view/ edit file cue
         self.edit_files_btn = ttk.Button(
@@ -162,9 +181,12 @@ class BuildCue(tk.Frame):
 
     def source_type_selected(self, event):
         event.widget['state'] = tk.DISABLED  # Disable changing file type
+        # Enable adding files/ folders and whether subfolders are to be included
         self.add_files_btn['state'] = tk.NORMAL
+        self.add_folder_btn['state'] = tk.NORMAL
+        self.include_subdir_chk['state'] = tk.NORMAL
 
-    def add_files_btn_clicked(self):
+    def add_files_btns_clicked(self, path_type):
         # Get the source file type selected in the combo box
         selected_source_type = self.source_type_combo.get()
 
@@ -176,22 +198,22 @@ class BuildCue(tk.Frame):
         # Extract the matching file type and file type label
         file_type = self.file_import_settings['file_type']
         file_type_label = self.file_import_settings['file_type_label']
-        self.add_files(file_type, file_type_label)
 
-    def add_files(self, file_type, file_type_label):
-        filetypes = (
-            (file_type_label, "*." + file_type),
-            ('All files (may not be compatible)', '*.*')
-        )
-        default_dir = '/home/jon/Documents/TestData/RecentData'
-        selected_file_list = fd.askopenfilenames(
-            title='Open files',
-            initialdir=default_dir,
-            filetypes=filetypes
-        )
-        if not type(selected_file_list) is tuple:  # Will be tuple unless user clicked cancel
-            return
-        self.cued_file_list += selected_file_list
+        if path_type == "files":  # Add files button clicked
+            self.add_files(file_type, file_type_label)
+        elif path_type == "folder":  # Add folders button clicked
+            self.add_folder(file_type)
+        else:  # How the hell did we get here?
+            messagebox.showerror(
+                title="Button callback function error",
+                message="Function called by file button is not recognised")
+            self.quit_script()
+
+    def add_files_to_cue(self, file_list):
+        passed_file_count = len(file_list)
+
+        self.cued_file_list += file_list
+
         # The difference between the tuple length (allow duplicates) and the set length (no duplicates) will be the
         # number of duplicates
         duplicate_count = len(self.cued_file_list) - len(set(self.cued_file_list))
@@ -199,7 +221,7 @@ class BuildCue(tk.Frame):
         # Convert to a set then back to a tuple to remove duplicates
         self.cued_file_list = tuple(set(self.cued_file_list))
         self.cued_file_count = len(self.cued_file_list)
-        msg_text = str(self.cued_file_count - duplicate_count) + " files added to cue"
+        msg_text = str(passed_file_count - duplicate_count) + " files added to cue"
         if duplicate_count > 0:
             msg_title = "Duplicates found"
             msg_text += "\n" + str(
@@ -214,6 +236,45 @@ class BuildCue(tk.Frame):
             self.edit_files_btn['state'] = tk.NORMAL
         self.update_cue_count_lbl()
 
+    def add_files(self, file_type, file_type_label):
+        filetypes = (
+            (file_type_label, "*." + file_type),
+            ('All files (may not be compatible)', '*.*')
+        )
+        default_dir = '/home/jon/Documents/TestData/RecentData'
+        selected_file_list = fd.askopenfilenames(
+            title='Open files',
+            initialdir=default_dir,
+            filetypes=filetypes
+        )
+        if not type(selected_file_list) is tuple:  # Will be tuple unless user clicked cancel
+            return
+        self.add_files_to_cue(selected_file_list)  # Remove duplicates and update count
+
+    def add_folder(self,  file_type):
+        default_dir = '/home/jon/Documents/TestData/RecentData'
+        selected_folder = fd.askdirectory(
+            title='Open files',
+            initialdir=default_dir,
+            mustexist=True
+        )
+        if not os.path.isdir(selected_folder):  # Will be unless user clicked cancel
+            return
+
+        file_list = list(self.cued_file_list)  # Start with existing tuple of files (as list)
+        # Combine chosen folder path with wildcard and passed file type
+        if self.include_subs.get():
+            add_subs = "**"
+        else:
+            add_subs = ""
+        file_filter = os.path.join(selected_folder, add_subs, "*." + file_type)
+        files = glob.glob(file_filter, recursive=self.include_subs.get())  # Get list of matching files and folders
+        for f in files:  # Add only files (not directories)
+            if os.path.isfile(f):
+                file_list.append(f)
+        # self.cued_file_list = tuple(file_list)  # Convert back to tuple
+        self.add_files_to_cue(tuple(file_list))  # As tuple to match what add files will produce
+
     def run_analysis_clicked(self):
         results_df = RunAnalysis(self.cued_file_list, self.file_import_settings, self)
 
@@ -221,8 +282,10 @@ class BuildCue(tk.Frame):
         self.cued_file_list = tuple()  # Clear the file cue
         self.cued_file_count = 0  # Reset file counter
         self.update_cue_count_lbl()  # Update the displayed value
-        self.source_type_combo['state'] = 'normal'  # Reactivate file type combo box
+        self.source_type_combo['state'] = tk.NORMAL  # Reactivate file type combo box
         self.add_files_btn['state'] = tk.DISABLED  # Disable add files button
+        self.add_folder_btn['state'] = tk.DISABLED  # Disable add folder button
+        self.include_subdir_chk['state'] = tk.DISABLED  # Disable include subfolders checkbox
         self.edit_files_btn['state'] = tk.DISABLED  # Disable view/ edit file cue button
         self.run_analysis_btn['state'] = tk.DISABLED  # Disable run analysis button
 
@@ -315,7 +378,7 @@ class EditCue(tk.Toplevel):
 
     def remove_selected_clicked(self):
         files_selected = self.file_list_listbox.curselection()
-        for index in files_selected[::-1]:  # Start from last item selected so that indicies aren't changed
+        for index in files_selected[::-1]:  # Start from last item selected so that indices aren't changed
             self.file_list_listbox.delete(index)
         self.save_changes_btn['state'] = tk.NORMAL  # Enable saving changes
         self.remove_selected_btn['state'] = tk.DISABLED  # Disable removing selected (they're already gone)
@@ -345,7 +408,7 @@ class RunAnalysis(tk.Toplevel):
         pdx = 5
         pdy = 5
 
-        # Create a temporary label- replace this with meaningful feedback
+        # Create a temporary label - replace this with meaningful feedback
         temp_lbl = Label(self, text="Add feedback on progress here")
         temp_lbl.pack(padx=pdx, pady=pdy)
 
@@ -370,6 +433,7 @@ class RunAnalysis(tk.Toplevel):
                 sep=import_settings['delim'],
                 skiprows=import_settings['skip'],
                 dtype={'Time': float, 'Frame': int, 'X': float, 'Y': float},
+                # converters={'Time': self.custom_data_converter},
                 engine=import_settings['engine'],
                 skipfooter=import_settings['skipfooter']
             )
@@ -381,14 +445,18 @@ class RunAnalysis(tk.Toplevel):
         else:
             return "File not found"
 
+    # def custom_data_converter(self, val):
+    #     try:
+    #         return float(val)
+    #     except:
+    #         return "#N/A"
+
     def analysis_complete(self):
         # Blows up with destroy if called directly from __init__ but not from a button command. Need to figure out why
         self.destroy()  # Finished with window, close it
 
 
 def main():
-    # print("Use custom file read = ", AnalysisTemplate.use_custom_file_read)
-
     # Get data file definitions
     data_file_definitions = get_file_definitions(11)  # Read in data file specifications (number of expected columns)
     if type(data_file_definitions) is pd.DataFrame:  # If script has returned a df rather than error code (integer)
@@ -404,3 +472,7 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+# Function used for testing function calls in JSON_play. Can be deleted after finished testing
+def test_func(vars):
+    print("test_func in bulk file called")
