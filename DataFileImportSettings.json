@@ -6,6 +6,7 @@
       "read_file_func": "read_text_file",
       "import_param": {
          "sep": ",",
+         "header": 8,
          "engine": "python",
          "skipfooter": 4
       }
@@ -16,7 +17,8 @@
       "read_file_module": "__main__",
       "read_file_func": "read_text_file",
       "import_param": {
-         "sep": "\t"
+         "sep": "\t",
+         "header": 19
       }
    }
 }

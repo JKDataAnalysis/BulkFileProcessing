@@ -282,7 +282,7 @@ class BuildCue(tk.Frame):
         self.add_files_to_cue(tuple(file_list))  # As tuple to match what add files will produce
 
     def run_analysis_clicked(self):
-        results_df = RunAnalysis(self.cued_file_list, self.file_import_settings["import_param"], self)
+        results_df = RunAnalysis(self.cued_file_list, self.file_import_settings, self)
 
     def reset_window(self):
         self.cued_file_list = tuple()  # Clear the file cue
@@ -423,7 +423,7 @@ class RunAnalysis(tk.Toplevel):
         close_btn.pack(padx=pdx, pady=pdy)
 
         for file in passed_file_list:
-            df = self.read_text_file(file, file_import_settings)
+            df = self.read_text_file(file, file_import_settings["import_param"])
             print(file, "\n", df)
 
         close_btn['state'] = tk.NORMAL
