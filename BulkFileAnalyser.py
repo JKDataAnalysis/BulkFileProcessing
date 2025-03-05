@@ -1,14 +1,14 @@
 """
 TODO
+    ====
+    NEXT
+    ====
+    * Add validation of selected source profile
+        - Must contain filetype, read_file_module and read_file_func
+    * Modify call to file read function to use module and function read in from import settings
     ====================
     Questions to resolve
     ====================
-    * Is it possible to pass a variable number of parameters to pd.read_csv so that not all possible import parameters
-    need to be set in the import settings file?
-    * How to read dtype (key value pairs) from csv file?
-    * Can't set both nrows and skipfooter in pd.read_csv. How can either of those options be given to users without
-    causing (or just supressing) errors? Have standard read in this file and custom in AnalysisTemplate file with a flag
-    (use_custom_file_read) set in the Analysis Template?
     =====
     Major
     =====
@@ -24,6 +24,7 @@ TODO
     Minor
     =====
     * padx and pady values are currently set within the classes rather than being passed to them
+        - Look at creating a style and setting to widgets
     * Vertical scroll bar on edit files listbox should only display if the number of files displayed is greater than the
      listbox height
     * default_dir to start looking for data files is temporarily set to location of tekscan test data. This should be
@@ -42,32 +43,37 @@ import tkinter as tk
 from tkinter import filedialog as fd
 from tkinter import messagebox
 from tkinter import ttk
-from xml.etree.ElementInclude import include
 
 import pandas as pd
 import os
 import sys
 from tkinter import *
 import glob
-
-# import numpy as np
-
-# import AnalysisTemplate
-# from AnalysisTemplate import external_read_info
+import json
 
 
-def get_file_definitions(expected_no_def_cols):
+def get_file_definitions():
     # Set file to default location and name
-    data_def_file = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), "DataFileSpec.csv")
+    data_def_file = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), "DataFileImportSettings.json")
     if os.path.exists(data_def_file):  # If the default file exists
-        arr = pd.read_csv(data_def_file, delimiter=",")  # Read it into a df
-        if arr.shape[0] >= 1 and arr.shape[1] == expected_no_def_cols:  # Check at least 1 source type and correct number of columns read
-            return arr
+        with open(data_def_file, "r") as fp:
+            data_file_defs = json.load(fp)
+        if isinstance(data_file_defs, dict): # If have successfully read in dictionary
+            if len(list(data_file_defs.keys())) >= 1:  # If there is at least one defined type
+                return data_file_defs
+            else:
+                messagebox.showerror(
+                    title="Failed to read data file definitions",
+                    message="Aborting: No data file definitions found",
+                    detail="Search path:\n" + data_def_file,
+                    icon='error'
+                )
+                return -3
         else:
             messagebox.showerror(
                 title="Failed to read data file definitions",
-                message="Aborting: Error in data file definitions found",
-                detail=f"Expected at least 1 row of {expected_no_def_cols} columns\nGot {arr.shape[0]} rows of {arr.shape[1]}",
+                message="Aborting: Error reading data file definitions",
+                detail="Search path:\n" + data_def_file,
                 icon='error'
             )
             return -2
@@ -102,7 +108,7 @@ class BuildCue(tk.Frame):
         defined_sources = tk.StringVar()
         self.source_type_combo = ttk.Combobox(self.choose_data_source_type_lblfrm, textvariable=defined_sources,
                                               state='readonly')
-        self.source_type_combo['values'] = self.data_file_defs['source'].tolist()
+        self.source_type_combo['values'] = list(self.data_file_defs.keys())
         self.source_type_combo.set("Choose data file type")
         self.source_type_combo.pack(padx=pdx, pady=pdy)
         self.source_type_combo.bind('<<ComboboxSelected>>', self.source_type_selected)
@@ -123,7 +129,7 @@ class BuildCue(tk.Frame):
         self.add_files_btn = ttk.Button(
             build_cue_btn_frm,
             text="Select files",
-        command=lambda: self.add_files_btns_clicked("files"))
+            command=lambda: self.add_files_btns_clicked("files"))
         self.add_files_btn.pack(padx=pdx, pady=pdy, side=tk.LEFT, anchor=tk.NW)
 
         # Create button to add folder
@@ -131,7 +137,6 @@ class BuildCue(tk.Frame):
             build_cue_btn_frm,
             text="Add ALL files in folder",
             command=lambda: self.add_files_btns_clicked("folder"))
-        # self.add_folder_btn.bind("<Button-1>", lambda x: self.add_files_btns_clicked("folder"))
         self.add_folder_btn.pack(padx=pdx, pady=pdy, side=tk.LEFT, anchor=tk.NW)
 
         # Create checkbox to include subfolders
@@ -188,21 +193,22 @@ class BuildCue(tk.Frame):
 
     def add_files_btns_clicked(self, path_type):
         # Get the source file type selected in the combo box
-        selected_source_type = self.source_type_combo.get()
+        selected_data_source = self.source_type_combo.get()
 
         # Get the import settings for the selected source file type
-        self.file_import_settings = self.data_file_defs.loc[self.data_file_defs['source'] == selected_source_type]
-        # Flatten to a pandas series
-        self.file_import_settings = self.file_import_settings.squeeze()
+        self.file_import_settings = self.data_file_defs[selected_data_source]
 
-        # Extract the matching file type and file type label
-        file_type = self.file_import_settings['file_type']
-        file_type_label = self.file_import_settings['file_type_label']
+        # Extract the matching file type, file type label and read file function details
+        # file_type = self.file_import_settings["file_type"]
+        # file_type_label = self.file_import_settings["file_type_label"]
+        # read_file_module = self.file_import_settings["read_file_module"]
+        # read_file_func = self.file_import_settings["read_file_func"]
+
 
         if path_type == "files":  # Add files button clicked
-            self.add_files(file_type, file_type_label)
+            self.add_files(self.file_import_settings["file_type"], self.file_import_settings["file_type_label"])
         elif path_type == "folder":  # Add folders button clicked
-            self.add_folder(file_type)
+            self.add_folder(self.file_import_settings["file_type"])
         else:  # How the hell did we get here?
             messagebox.showerror(
                 title="Button callback function error",
@@ -276,7 +282,7 @@ class BuildCue(tk.Frame):
         self.add_files_to_cue(tuple(file_list))  # As tuple to match what add files will produce
 
     def run_analysis_clicked(self):
-        results_df = RunAnalysis(self.cued_file_list, self.file_import_settings, self)
+        results_df = RunAnalysis(self.cued_file_list, self.file_import_settings["import_param"], self)
 
     def reset_window(self):
         self.cued_file_list = tuple()  # Clear the file cue
@@ -417,7 +423,8 @@ class RunAnalysis(tk.Toplevel):
         close_btn.pack(padx=pdx, pady=pdy)
 
         for file in passed_file_list:
-            df = self.read_data_file(file, file_import_settings)
+            df = self.read_text_file(file, file_import_settings)
+            print(file, "\n", df)
 
         close_btn['state'] = tk.NORMAL
 
@@ -426,30 +433,18 @@ class RunAnalysis(tk.Toplevel):
         self.grab_set()  # hijack all commands from the master (clicks on the main window are ignored)
         master.wait_window(self)  # pause anything on the main window until this one closes
 
-    def read_data_file(self, file, import_settings):
+    def read_text_file(self, file, import_settings):
         if os.path.exists(file):  # If the file exists
             df = pd.read_csv(
                 file,
-                sep=import_settings['delim'],
-                skiprows=import_settings['skip'],
-                dtype={'Time': float, 'Frame': int, 'X': float, 'Y': float},
-                # converters={'Time': self.custom_data_converter},
-                engine=import_settings['engine'],
-                skipfooter=import_settings['skipfooter']
+                **import_settings
             )
-            print(file, "\n", df.dtypes, "\nShape: ", df.shape, "\n", df.tail(10))
-            if df is pd.DataFrame:
+            if isinstance(df, pd.DataFrame):
                 return df
             else:
                 return "Could not read file"
         else:
             return "File not found"
-
-    # def custom_data_converter(self, val):
-    #     try:
-    #         return float(val)
-    #     except:
-    #         return "#N/A"
 
     def analysis_complete(self):
         # Blows up with destroy if called directly from __init__ but not from a button command. Need to figure out why
@@ -458,8 +453,10 @@ class RunAnalysis(tk.Toplevel):
 
 def main():
     # Get data file definitions
-    data_file_definitions = get_file_definitions(11)  # Read in data file specifications (number of expected columns)
-    if type(data_file_definitions) is pd.DataFrame:  # If script has returned a df rather than error code (integer)
+    data_file_definitions = get_file_definitions()  # Read in data file specifications
+    print(type(data_file_definitions))
+
+    if isinstance(data_file_definitions, dict):  # If script has returned a df rather than error code (integer)
         # create root window.
         root = tk.Tk()
         root.title("Bulk file analyser")
@@ -472,7 +469,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-# Function used for testing function calls in JSON_play. Can be deleted after finished testing
-def test_func(vars):
-    print("test_func in bulk file called")

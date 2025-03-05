@@ -1,0 +1,22 @@
+{
+   "Footscan SAM": {
+      "file_type": "csv",
+      "file_type_label": "Tekscan SAM",
+      "read_file_module": "__main__",
+      "read_file_func": "read_text_file",
+      "import_param": {
+         "sep": ",",
+         "engine": "python",
+         "skipfooter": 4
+      }
+   },
+   "Kistler Bioware": {
+      "file_type": "txt",
+      "file_type_label": "Kistler Bioware",
+      "read_file_module": "__main__",
+      "read_file_func": "read_text_file",
+      "import_param": {
+         "sep": "\t"
+      }
+   }
+}
