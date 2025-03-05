@@ -4,22 +4,18 @@ TODO
     NEXT
     ====
     * Add validation of selected source profile
-        - Must contain filetype, read_file_module and read_file_func
-    * Modify call to file read function to use module and function read in from import settings
-    ====================
-    Questions to resolve
-    ====================
+        - Must contain filetype, read_file_module and read_file_func and have import_settings (even if empty)
+    * Add pre-processing function as for file read function to allow option to clean up files before trying to read them
+    * Add dtype to Tekscan profile and see if the file read falls over
+        - also add to Bioware profile
     =====
     Major
     =====
     * Create window to run analysis- just show progress bar and label
         - Once complete show options for results- save as / view
-    --- Start of loop
-        * Read in file
-        * Process data in first file
-        * Add results of processing to results df
-    --- End of loop
+    * Add results of processing to results df
     * Write results df to file
+    * Clear cue
     =====
     Minor
     =====
@@ -37,6 +33,7 @@ TODO
     given that I'm not likely to be using Tekscan data any time soon, this probably doesn't need to be done and
     certainly not as part of this script. Do need to make the script more robust in handling such errors though as they
     could be encountered in other files
+    * reading in delim file is not very robust. Will make a mess of whole import if there's a missing values
 """
 
 import tkinter as tk
@@ -58,7 +55,7 @@ def get_file_definitions():
     if os.path.exists(data_def_file):  # If the default file exists
         with open(data_def_file, "r") as fp:
             data_file_defs = json.load(fp)
-        if isinstance(data_file_defs, dict): # If have successfully read in dictionary
+        if isinstance(data_file_defs, dict):  # If have successfully read in dictionary
             if len(list(data_file_defs.keys())) >= 1:  # If there is at least one defined type
                 return data_file_defs
             else:
@@ -198,17 +195,12 @@ class BuildCue(tk.Frame):
         # Get the import settings for the selected source file type
         self.file_import_settings = self.data_file_defs[selected_data_source]
 
-        # Extract the matching file type, file type label and read file function details
-        # file_type = self.file_import_settings["file_type"]
-        # file_type_label = self.file_import_settings["file_type_label"]
-        # read_file_module = self.file_import_settings["read_file_module"]
-        # read_file_func = self.file_import_settings["read_file_func"]
-
-
         if path_type == "files":  # Add files button clicked
-            self.add_files(self.file_import_settings["file_type"], self.file_import_settings["file_type_label"])
+            self.add_files(
+                self.file_import_settings["file_type"]["type"],
+                self.file_import_settings["file_type"]["label"])
         elif path_type == "folder":  # Add folders button clicked
-            self.add_folder(self.file_import_settings["file_type"])
+            self.add_folder(self.file_import_settings["file_type"]["type"])
         else:  # How the hell did we get here?
             messagebox.showerror(
                 title="Button callback function error",
@@ -405,6 +397,21 @@ class EditCue(tk.Toplevel):
         self.destroy()  # Close the window
 
 
+def read_text_file(file, import_settings):
+    if os.path.exists(file):  # If the file exists
+        df = pd.read_csv(
+            file,
+            on_bad_lines="warn",
+            **import_settings
+        )
+        if isinstance(df, pd.DataFrame):
+            return df
+        else:
+            return "Could not read file"
+    else:
+        return "File not found"
+
+
 class RunAnalysis(tk.Toplevel):
     """modal window requires a master"""
     def __init__(self, passed_file_list, file_import_settings, master, **kwargs):
@@ -422,29 +429,34 @@ class RunAnalysis(tk.Toplevel):
         close_btn = Button(self, text="Close", command=self.analysis_complete, state=tk.DISABLED)
         close_btn.pack(padx=pdx, pady=pdy)
 
-        for file in passed_file_list:
-            df = self.read_text_file(file, file_import_settings["import_param"])
-            print(file, "\n", df)
+        # Set read file function from details read from import settings file
+        if file_import_settings['read_file_func']['module'] == __name__:
+            app = sys.modules[file_import_settings['read_file_func']['module']]
+        else:
+            app = globals()[file_import_settings['read_file_func']['module']]
+        f = file_import_settings['read_file_func']['func']
+        if hasattr(app, f):  # Function exists
+            read_file_func = getattr(app, f)  # Set as read file function
+            # Iterate through each file in cue and process
+            for file in passed_file_list:
+                df = read_file_func(file, file_import_settings["import_param"])
+                print(file)
+                print(df.shape)
 
-        close_btn['state'] = tk.NORMAL
+        else:
+            messagebox.showerror(
+                title="File read function not recognised",
+                message="Aborting: File read function not recognised",
+                detail="Module: " + str(app) + "\n\nFunction: " + str(f),
+                icon='error'
+            )
+            temp_lbl['text'] = "Analysis aborted"
+        close_btn['state'] = tk.NORMAL  # Processing complete. Allow user to close window
 
         # The following commands keep the popup on top and stop clicking on the main window during editing
         self.transient(master)  # set to be on top of the main window
         self.grab_set()  # hijack all commands from the master (clicks on the main window are ignored)
         master.wait_window(self)  # pause anything on the main window until this one closes
-
-    def read_text_file(self, file, import_settings):
-        if os.path.exists(file):  # If the file exists
-            df = pd.read_csv(
-                file,
-                **import_settings
-            )
-            if isinstance(df, pd.DataFrame):
-                return df
-            else:
-                return "Could not read file"
-        else:
-            return "File not found"
 
     def analysis_complete(self):
         # Blows up with destroy if called directly from __init__ but not from a button command. Need to figure out why
@@ -454,7 +466,6 @@ class RunAnalysis(tk.Toplevel):
 def main():
     # Get data file definitions
     data_file_definitions = get_file_definitions()  # Read in data file specifications
-    print(type(data_file_definitions))
 
     if isinstance(data_file_definitions, dict):  # If script has returned a df rather than error code (integer)
         # create root window.

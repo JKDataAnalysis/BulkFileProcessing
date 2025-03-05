@@ -1,21 +1,38 @@
 {
    "Footscan SAM": {
-      "file_type": "csv",
-      "file_type_label": "Tekscan SAM",
-      "read_file_module": "__main__",
-      "read_file_func": "read_text_file",
+      "file_type": {
+         "type": "csv",
+         "label": "Tekscan SAM"
+      },
+      "clean_file_func": {
+         "module": "__main__",
+         "func": ""
+      },
+      "read_file_func": {
+         "module": "__main__",
+         "func": "read_text_file"
+      },
       "import_param": {
          "sep": ",",
-         "header": 8,
+         "header": 7,
          "engine": "python",
-         "skipfooter": 4
+         "skipfooter": 4,
+         "index_col": "Frame"
       }
    },
    "Kistler Bioware": {
-      "file_type": "txt",
-      "file_type_label": "Kistler Bioware",
-      "read_file_module": "__main__",
-      "read_file_func": "read_text_file",
+      "file_type": {
+         "type": "txt",
+         "label": "Kistler Bioware"
+      },
+      "clean_file_func": {
+         "module": "__main__",
+         "func": ""
+      },
+      "read_file_func": {
+         "module": "__main__",
+         "func": "read_text_file"
+      },
       "import_param": {
          "sep": "\t",
          "header": 19
