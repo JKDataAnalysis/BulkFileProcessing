@@ -1,5 +1,5 @@
 {
-   "Footscan SAM": {
+   "Tekscan Footscan SAM (text)": {
       "file_type": {
          "type": "csv",
          "label": "Tekscan SAM"
@@ -20,7 +20,7 @@
          "index_col": "Frame"
       }
    },
-   "Kistler Bioware": {
+   "Kistler Bioware (text)": {
       "file_type": {
          "type": "txt",
          "label": "Kistler Bioware"

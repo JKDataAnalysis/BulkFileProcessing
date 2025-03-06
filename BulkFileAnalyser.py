@@ -3,6 +3,8 @@ TODO
     ====
     NEXT
     ====
+    * Get read file function selection to work when calling functions from outside of this script. See notes in
+    Import_test
     * Add validation of selected source profile
         - Must contain filetype, read_file_module and read_file_func and have import_settings (even if empty)
     * Add pre-processing function as for file read function to allow option to clean up files before trying to read them
@@ -47,8 +49,6 @@ import sys
 from tkinter import *
 import glob
 import json
-
-import AnalysisTemplate
 
 
 def get_file_definitions():
@@ -100,21 +100,27 @@ class BuildCue(tk.Frame):
         pdy = 5
 
         # create choose source data file type label
-        self.choose_data_source_type_lblfrm = LabelFrame(self, text="Select source data file type")
+        self.choose_data_source_type_lblfrm = LabelFrame(self, text="Data file import profile")
         self.choose_data_source_type_lblfrm.pack(padx=pdx, pady=pdy, side=tk.TOP, anchor=tk.NW)
 
         # create combobox object to select data file type
         defined_sources = tk.StringVar()
-        self.source_type_combo = ttk.Combobox(self.choose_data_source_type_lblfrm, textvariable=defined_sources,
-                                              state='readonly')
+        self.source_type_combo = ttk.Combobox(
+            self.choose_data_source_type_lblfrm,
+            textvariable=defined_sources,
+            state='readonly')
         self.source_type_combo['values'] = list(self.data_file_defs.keys())
         self.source_type_combo.set("Choose data file type")
-        self.source_type_combo.pack(padx=pdx, pady=pdy)
+        self.source_type_combo.pack(padx=pdx, pady=pdy, side=tk.LEFT, anchor=tk.NW)
         self.source_type_combo.bind('<<ComboboxSelected>>', self.source_type_selected)
 
-        # create choose data file type label
-        choose_data_filetype_lblfrm = LabelFrame(self, text="Select data file type")
-        choose_data_filetype_lblfrm.pack(padx=pdx, pady=pdy, side=tk.TOP, anchor=tk.NW)
+        # create button to add import profile
+        self.add_files_btn = ttk.Button(
+            self.choose_data_source_type_lblfrm,
+            text="Add import profile",
+            command=lambda: print("Does nowt yet")
+        )
+        self.add_files_btn.pack(padx=pdx, pady=pdy, side=tk.LEFT, anchor=tk.NE)
 
         # Create a frame for file cue widgets
         data_files_lblfrm = LabelFrame(self, text="File cue")
@@ -430,11 +436,14 @@ def save_df_to_file(df, dflt_ext='.csv', incl_index=False, confirm_overwrite=Tru
     while not saved_file:
         filename = fd.asksaveasfilename(confirmoverwrite=confirm_overwrite, defaultextension=dflt_ext)
         if filename:  # Will evaluate as True if a filename is returned
+            print(filename)
             df.to_csv(filename, index=incl_index)
+            saved_file = True
         else:  # Will evaluate as False if the string is empty (user clicked Cancel)
             ans = messagebox.askretrycancel(
                 title="Results not saved",
-                message="Results not saved. Close without saving?")
+                message="Results are not saved\nCancel saving?",
+                icon='warning')
             if not ans:  # User clicked Cancel
                 saved_file = True
 
@@ -468,23 +477,18 @@ class RunAnalysis(tk.Toplevel):
             if hasattr(module, fnc):
                 read_file_func_valid = True
                 read_file_func = getattr(module, fnc)
-
         if read_file_func_valid:
-
-
-
-
-                # app = sys.modules[file_import_settings['read_file_func']['module']]
-        # # if file_import_settings['read_file_func']['module'] == __name__:
-        # #     app = sys.modules[file_import_settings['read_file_func']['module']]
-        # # else:  # If calling this file from another one
-        # #     print("globals")
-        # #     app = file_import_settings['read_file_func']['module']
-        #     # app = globals()[file_import_settings['read_file_func']['module']]
-        #
-        # if hasattr(app, f):  # Function exists
-        #     read_file_func = getattr(app, f)  # Set as read file function
-        #     # Iterate through each file in cue and process
+            # app = sys.modules[file_import_settings['read_file_func']['module']]
+            # # if file_import_settings['read_file_func']['module'] == __name__:
+            # #     app = sys.modules[file_import_settings['read_file_func']['module']]
+            # # else:  # If calling this file from another one
+            # #     print("globals")
+            # #     app = file_import_settings['read_file_func']['module']
+            #     # app = globals()[file_import_settings['read_file_func']['module']]
+            #
+            # if hasattr(app, f):  # Function exists
+            #     read_file_func = getattr(app, f)  # Set as read file function
+            #     # Iterate through each file in cue and process
             all_results_list = []  # Create empty list for storing list of dicts of all results
             for file in passed_file_list:
                 data_df = read_file_func(file, file_import_settings["import_param"])
