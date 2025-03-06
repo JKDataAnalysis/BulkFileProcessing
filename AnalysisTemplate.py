@@ -1,12 +1,29 @@
 import BulkFileAnalyser
+import os
+import pandas as pd
 
 
-def external_read_info():
-    return({"engine": "python",
-            "skipfooter": 4})
+def read_text_file_AT(file, import_settings):
+    if os.path.exists(file):  # If the file exists
+        df = pd.read_csv(
+            file,
+            on_bad_lines="warn",
+            **import_settings
+        )
+        if isinstance(df, pd.DataFrame):
+            return df
+        else:
+            return "Could not read file"
+    else:
+        return "File not found"
+
+def analysis(df):
+    return df
+
+def test_func(*args):
+    print("Called test function")
+    print(*args)
 
 if __name__ == '__main__':
-    # Whether to use the standard function in BulkFileAnalyzer to read files based upon their import settings in the
-    # DataFileSPec.sv file or to use custom_read_file function in this file
-    use_custom_file_read = True
     BulkFileAnalyser.main()  # Use bulk file analyser file to get a list of files and iterate through them for analysis
+

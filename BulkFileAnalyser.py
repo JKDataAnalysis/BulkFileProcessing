@@ -48,6 +48,8 @@ from tkinter import *
 import glob
 import json
 
+import AnalysisTemplate
+
 
 def get_file_definitions():
     # Set file to default location and name
@@ -274,7 +276,7 @@ class BuildCue(tk.Frame):
         self.add_files_to_cue(tuple(file_list))  # As tuple to match what add files will produce
 
     def run_analysis_clicked(self):
-        results_df = RunAnalysis(self.cued_file_list, self.file_import_settings, self)
+        RunAnalysis(self.cued_file_list, self.file_import_settings, self)
 
     def reset_window(self):
         self.cued_file_list = tuple()  # Clear the file cue
@@ -335,13 +337,20 @@ class EditCue(tk.Toplevel):
         edit_btn_frame = Frame(self)
         edit_btn_frame.pack(side=tk.RIGHT, anchor=NE)
 
+        # Create a button to select all files
+        self.select_all_btn = ttk.Button(
+            edit_btn_frame,
+            text="Selected all",
+            command=self.select_all_clicked)
+        self.select_all_btn.pack(padx=pdx, pady=pdy, side=TOP, fill=X)
+
         # Create a button to remove selected files
         self.remove_selected_btn = ttk.Button(
             edit_btn_frame,
             text="Remove selected",
             command=self.remove_selected_clicked,
             state=tk.DISABLED)  # Start with button disabled until files are selected
-        self.remove_selected_btn.pack(padx=pdx, pady=pdy, side=TOP)
+        self.remove_selected_btn.pack(padx=pdx, pady=pdy, side=TOP, fill=X)
 
         # Create a button to save changes to list
         self.save_changes_btn = ttk.Button(
@@ -349,19 +358,23 @@ class EditCue(tk.Toplevel):
             text="Save changes",
             command=self.save_changes_clicked,
             state=tk.DISABLED)
-        self.save_changes_btn.pack(padx=pdx, pady=pdy, side=TOP)
+        self.save_changes_btn.pack(padx=pdx, pady=pdy, side=TOP, fill=X)
 
         # Create a button to close (destroy) this window.
         close_btn = ttk.Button(
             edit_btn_frame,
             text="Cancel",
             command=self.close_clicked)
-        close_btn.pack(padx=pdx, pady=pdy, side=TOP)
+        close_btn.pack(padx=pdx, pady=pdy, side=TOP, fill=X)
 
         # The following commands keep the popup on top and stop clicking on the main window during editing
         self.transient(master)  # set to be on top of the main window
         self.grab_set()  # hijack all commands from the master (clicks on the main window are ignored)
         master.wait_window(self)  # pause anything on the main window until this one closes
+
+    def select_all_clicked(self):
+        self.file_list_listbox.select_set(0, END)
+        self.remove_selected_btn['state'] = tk.NORMAL
 
     def list_item_selected(self, event):
         selected = event.widget.curselection()
@@ -412,6 +425,20 @@ def read_text_file(file, import_settings):
         return "File not found"
 
 
+def save_df_to_file(df, dflt_ext='.csv', incl_index=False, confirm_overwrite=True):
+    saved_file = False
+    while not saved_file:
+        filename = fd.asksaveasfilename(confirmoverwrite=confirm_overwrite, defaultextension=dflt_ext)
+        if filename:  # Will evaluate as True if a filename is returned
+            df.to_csv(filename, index=incl_index)
+        else:  # Will evaluate as False if the string is empty (user clicked Cancel)
+            ans = messagebox.askretrycancel(
+                title="Results not saved",
+                message="Results not saved. Close without saving?")
+            if not ans:  # User clicked Cancel
+                saved_file = True
+
+
 class RunAnalysis(tk.Toplevel):
     """modal window requires a master"""
     def __init__(self, passed_file_list, file_import_settings, master, **kwargs):
@@ -430,28 +457,60 @@ class RunAnalysis(tk.Toplevel):
         close_btn.pack(padx=pdx, pady=pdy)
 
         # Set read file function from details read from import settings file
-        if file_import_settings['read_file_func']['module'] == __name__:
-            app = sys.modules[file_import_settings['read_file_func']['module']]
+        module = file_import_settings['read_file_func']['module']
+        fnc = file_import_settings['read_file_func']['func']
+        read_file_func_valid = False
+        if module == "LOCAL":
+            if fnc in globals():
+                read_file_func_valid = True
+                read_file_func = eval(fnc)
         else:
-            app = globals()[file_import_settings['read_file_func']['module']]
-        f = file_import_settings['read_file_func']['func']
-        if hasattr(app, f):  # Function exists
-            read_file_func = getattr(app, f)  # Set as read file function
-            # Iterate through each file in cue and process
-            for file in passed_file_list:
-                df = read_file_func(file, file_import_settings["import_param"])
-                print(file)
-                print(df.shape)
+            if hasattr(module, fnc):
+                read_file_func_valid = True
+                read_file_func = getattr(module, fnc)
 
+        if read_file_func_valid:
+
+
+
+
+                # app = sys.modules[file_import_settings['read_file_func']['module']]
+        # # if file_import_settings['read_file_func']['module'] == __name__:
+        # #     app = sys.modules[file_import_settings['read_file_func']['module']]
+        # # else:  # If calling this file from another one
+        # #     print("globals")
+        # #     app = file_import_settings['read_file_func']['module']
+        #     # app = globals()[file_import_settings['read_file_func']['module']]
+        #
+        # if hasattr(app, f):  # Function exists
+        #     read_file_func = getattr(app, f)  # Set as read file function
+        #     # Iterate through each file in cue and process
+            all_results_list = []  # Create empty list for storing list of dicts of all results
+            for file in passed_file_list:
+                data_df = read_file_func(file, file_import_settings["import_param"])
+                file_results_dict = {
+                    "Filename": os.path.splitext(os.path.basename(file))[0],
+                    "Path": os.path.dirname(file),
+                    "Rows": data_df.shape[0],
+                    "Columns": data_df.shape[1]
+                }
+                # print("BulkFileAnalyser", hasattr(sys.modules["__name__"], "analysis"))
+                all_results_list.append(file_results_dict)  # Add results from file to list of dicts
+            results_df = pd.DataFrame(all_results_list)  # Convert list to df
+            print(results_df)
+            save_df_to_file(results_df)
+
+            self.analysis_complete()
+            return
         else:
             messagebox.showerror(
                 title="File read function not recognised",
                 message="Aborting: File read function not recognised",
-                detail="Module: " + str(app) + "\n\nFunction: " + str(f),
+                detail="Module: " + module + "\n\nFunction: " + fnc,
                 icon='error'
             )
             temp_lbl['text'] = "Analysis aborted"
-        close_btn['state'] = tk.NORMAL  # Processing complete. Allow user to close window
+            close_btn['state'] = tk.NORMAL  # Processing complete. Allow user to close window
 
         # The following commands keep the popup on top and stop clicking on the main window during editing
         self.transient(master)  # set to be on top of the main window

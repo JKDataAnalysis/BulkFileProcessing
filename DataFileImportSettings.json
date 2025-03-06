@@ -5,11 +5,11 @@
          "label": "Tekscan SAM"
       },
       "clean_file_func": {
-         "module": "__main__",
+         "module": "LOCAL",
          "func": ""
       },
       "read_file_func": {
-         "module": "__main__",
+         "module": "LOCAL",
          "func": "read_text_file"
       },
       "import_param": {
@@ -26,7 +26,7 @@
          "label": "Kistler Bioware"
       },
       "clean_file_func": {
-         "module": "__main__",
+         "module": "local",
          "func": ""
       },
       "read_file_func": {

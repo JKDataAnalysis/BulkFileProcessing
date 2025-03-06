@@ -1,5 +1,0 @@
-source file_type file_type_label delim maxn skip sr_skp sr_colm colm_type colm_names
-FootscanSAM csv Tekscan_SAM , 1000 9 5 2 d_dd Time,NA,Ax,Ay
-BiowareAxAy txt Bioware \t -1 19 3 3 ddd Time,Ax,Ay
-BiowareAxAyFz txt Bioware \t -1 19 3 3 dddd Time,Fz,Ax,Ay
-BiowareAxAyFxFyFz txt Bioware \t -1 19 3 3 dddddd Time,Fx,Fy,Fz,Ax,Ay
