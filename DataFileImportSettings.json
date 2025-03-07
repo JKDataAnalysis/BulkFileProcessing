@@ -1,41 +1,52 @@
 {
-   "Tekscan Footscan SAM (text)": {
-      "file_type": {
-         "type": "csv",
-         "label": "Tekscan SAM"
+      "Tekscan Footscan SAM (text)": {
+            "file_type": {
+                  "type": "csv",
+                  "label": "Tekscan SAM"
+            },
+            "clean_file_func": {
+                  "module": "",
+                  "func": ""
+            },
+            "read_file_func": {
+                  "module": "",
+                  "func": "read_text_file"
+            },
+            "analysis_func": {
+                  "module": "",
+                  "func": "temp_analysis_func"
+            },
+            "import_param": {
+                  "sep": ",",
+                  "header": 8,
+                  "engine": "python",
+                  "skipfooter": 4,
+                  "dtype": {
+                        "Time": "float",
+                        "Frame": "int"
+                  }
+            }
       },
-      "clean_file_func": {
-         "module": "LOCAL",
-         "func": ""
-      },
-      "read_file_func": {
-         "module": "LOCAL",
-         "func": "read_text_file"
-      },
-      "import_param": {
-         "sep": ",",
-         "header": 7,
-         "engine": "python",
-         "skipfooter": 4,
-         "index_col": "Frame"
+      "Kistler Bioware (text)": {
+            "file_type": {
+                  "type": "txt",
+                  "label": "Kistler Bioware"
+            },
+            "clean_file_func": {
+                  "module": "",
+                  "func": ""
+            },
+            "read_file_func": {
+                  "module": "",
+                  "func": "read_text_file"
+            },
+            "analysis_func": {
+                  "module": "",
+                  "func": ""
+            },
+            "import_param": {
+                  "sep": "\t",
+                  "header": 19
+            }
       }
-   },
-   "Kistler Bioware (text)": {
-      "file_type": {
-         "type": "txt",
-         "label": "Kistler Bioware"
-      },
-      "clean_file_func": {
-         "module": "local",
-         "func": ""
-      },
-      "read_file_func": {
-         "module": "__main__",
-         "func": "read_text_file"
-      },
-      "import_param": {
-         "sep": "\t",
-         "header": 19
-      }
-   }
 }

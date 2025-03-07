@@ -53,10 +53,6 @@ import_settings = {
 }
 
 
-def read_text_file():
-    print("Local test function 'read text file' called")
-
-
 # Should be outwith class
 def check_dict_keys(d, key_list):
     for key in key_list:

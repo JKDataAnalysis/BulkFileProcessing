@@ -3,9 +3,11 @@ TODO
     ====
     NEXT
     ====
+    * Sort error handling if key or function errors found
+        - messagebox rather than print
+        - Remove source type
     * Move validation of selected source profile (Check_import_settings) into this file to be run when a source
      is selected
-     * Remove existing validation code when analysis is run
     =====
     Later
     =====
@@ -40,6 +42,7 @@ import sys
 from tkinter import *
 import glob
 import json
+import importlib
 
 
 def get_file_definitions():
@@ -80,11 +83,11 @@ def get_file_definitions():
 class BuildCue(tk.Frame):
     def __init__(self, data_file_definitions, master=None, **kwargs):
         super().__init__(master, **kwargs)
-    # def __init__(self, data_file_definitions):
         self.file_import_settings = None
         self.cued_file_list = None
         self.cued_file_count = 0  # Reset file counter
         self.data_file_defs = data_file_definitions
+        self.file_handling_funcs = {}  # Dictionary of file handling functions and keys as labels
 
         # x, y padding for tkinter objects
         pdx = 5
@@ -179,11 +182,43 @@ class BuildCue(tk.Frame):
         # Set window to initial conditions
         self.reset_window()
 
-    def check_import_profile(self):
-        print("Add code here")
+    def check_import_profile(self, selected_import_settings):
+        # Dictionary of keys that selected import settings must contain to be valid
+        required_keys_list = {
+            "file_type": ["type", "label"],
+            "clean_file_func": ["module", "func"],
+            "read_file_func": ["module", "func"],
+            "analysis_func": ["module", "func"],
+            "import_param": []
+        }
+
+
+        # Check selected dictionary against required keys
+        key_error = self.check_import_setting_keys(selected_import_settings, required_keys_list)
+        if key_error:
+            return "Key error: " + key_error
+
+        # Filter dictionary keys for only those that end in '_func'
+        func_dict = {k: v for k, v in selected_import_settings.items() if k.endswith('_func')}
+        self.file_handling_funcs = self.check_import_setting_func(func_dict)
+        if not isinstance(self.file_handling_funcs, dict):
+            print("Function error:", self.file_handling_funcs)
+        else:
+            print('Functions OK')
+
+            # # Functions can now be called by filtering the dictionary for the required key/ value pair as:
+            # self.file_handling_funcs['read_file_func']()
+            # self.file_handling_funcs['analysis_func']()
 
     def source_type_selected(self, event):
-        self.check_import_profile(self.file_import_settings)
+        # Get the source file type selected in the combo box
+        selected_data_source = self.source_type_combo.get()
+
+        # Get the import settings for the selected source file type
+        self.file_import_settings = self.data_file_defs[selected_data_source]
+
+        source_error = self.check_import_profile(self.file_import_settings)
+
         event.widget['state'] = tk.DISABLED  # Disable changing file type
         # Enable adding files/ folders and whether subfolders are to be included
         self.add_files_btn['state'] = tk.NORMAL
@@ -191,11 +226,7 @@ class BuildCue(tk.Frame):
         self.include_subdir_chk['state'] = tk.NORMAL
 
     def add_files_btns_clicked(self, path_type):
-        # Get the source file type selected in the combo box
-        selected_data_source = self.source_type_combo.get()
 
-        # Get the import settings for the selected source file type
-        self.file_import_settings = self.data_file_defs[selected_data_source]
 
         if path_type == "files":  # Add files button clicked
             self.add_files(
@@ -208,6 +239,33 @@ class BuildCue(tk.Frame):
                 title="Button callback function error",
                 message="Function called by file button is not recognised")
             self.quit_script()
+
+    def check_import_setting_keys(self, dict_to_check, check_list):
+        # Check first level keys
+        k = check_dict_keys(dict_to_check.keys(), check_list.keys())
+        if k:  # Errors found in first level keys
+            return f"First level: key '{k}' not found"
+
+        # Check second level keys
+        for sub_key in check_list:
+            sub_dict = dict_to_check[sub_key].keys()
+            check_sub_keys = check_list[sub_key]
+            if len(check_sub_keys) > 0:  # Don't check subkeys if there aren't any
+                if check_dict_keys(sub_dict, check_sub_keys):
+                    return f"Second level: key '{sub_key}' not found"  # Errors found in second level keys
+        return False  # No errors found
+
+    def check_import_setting_func(self, func_dict):
+        functions = {}
+        for d in func_dict:
+            # Check function unless it's the clean_file_func (optional) AND there is no value set for func
+            if not (d == "clean_file_func" and not func_dict[d]['func']):  # Empty string will return as True
+                r = check_functions(func_dict[d])
+                if isinstance(r, str):  # If returned an error message
+                    return d + ': ' + r
+                else:
+                    functions[d] = r
+        return functions
 
     def add_files_to_cue(self, file_list):
         passed_file_count = len(file_list)
@@ -276,7 +334,11 @@ class BuildCue(tk.Frame):
         self.add_files_to_cue(tuple(file_list))  # As tuple to match what add files will produce
 
     def run_analysis_clicked(self):
-        RunAnalysis(self.cued_file_list, self.file_import_settings, self)
+        RunAnalysis(
+            self.cued_file_list,
+            self.file_import_settings,
+            self.file_handling_funcs,
+            self)
 
     def reset_window(self):
         self.cued_file_list = tuple()  # Clear the file cue
@@ -430,8 +492,8 @@ def save_df_to_file(df, dflt_ext='.csv', incl_index=False, confirm_overwrite=Tru
     while not saved_file:
         filename = fd.asksaveasfilename(confirmoverwrite=confirm_overwrite, defaultextension=dflt_ext)
         if filename:  # Will evaluate as True if a filename is returned
-            print(filename)
             df.to_csv(filename, index=incl_index)
+            print('Results file saved to:',filename)
             saved_file = True
         else:  # Will evaluate as False if the string is empty (user clicked Cancel)
             ans = messagebox.askretrycancel(
@@ -444,8 +506,10 @@ def save_df_to_file(df, dflt_ext='.csv', incl_index=False, confirm_overwrite=Tru
 
 class RunAnalysis(tk.Toplevel):
     """modal window requires a master"""
-    def __init__(self, passed_file_list, file_import_settings, master, **kwargs):
+    def __init__(self, passed_file_list, file_import_settings, file_handling_funcs, master, **kwargs):
         super().__init__(master, **kwargs)
+
+        self.file_handling_funcs = file_handling_funcs
 
         # x, y padding for tkinter objects
         pdx = 5
@@ -462,17 +526,15 @@ class RunAnalysis(tk.Toplevel):
         #     # Iterate through each file in cue and process
         all_results_list = []  # Create empty list for storing list of dicts of all results
         for file in passed_file_list:
-            data_df = read_file_func(file, file_import_settings["import_param"])
+            data_df = self.file_handling_funcs['read_file_func'](file, file_import_settings["import_param"])
             file_results_dict = {
                 "Filename": os.path.splitext(os.path.basename(file))[0],
                 "Path": os.path.dirname(file),
                 "Rows": data_df.shape[0],
                 "Columns": data_df.shape[1]
             }
-            # print("BulkFileAnalyser", hasattr(sys.modules["__name__"], "analysis"))
             all_results_list.append(file_results_dict)  # Add results from file to list of dicts
             results_df = pd.DataFrame(all_results_list)  # Convert list to df
-            print(results_df)
             save_df_to_file(results_df)
 
             self.analysis_complete()
@@ -487,6 +549,55 @@ class RunAnalysis(tk.Toplevel):
     def analysis_complete(self):
         # Blows up with destroy if called directly from __init__ but not from a button command. Need to figure out why
         self.destroy()  # Finished with window, close it
+
+
+# Should be outwith class
+def check_dict_keys(d, key_list):
+    for key in key_list:
+        if key not in d:
+            return key  # Return key not found
+    return False  # No missing keys found
+
+
+def check_functions(func_to_check):
+    module = func_to_check['module']
+    func = func_to_check['func']
+
+    if not module:  # Blank string: function is within calling script
+        if func in globals():
+            if callable(eval(func)):  # Check that the object is callable, i.e. a function
+                return eval(func)
+            else:
+                return f"Object '{func}' found in calling script but it is not callable"
+        else:
+            return f"Function '{func}' not found in calling script"
+    else:
+        if module in sys.modules:  # Check if module is already in imports
+            module = sys.modules[module]
+            if hasattr(module, func):  # Check if object exists within the module
+                if callable(getattr(module, func, None)):  # Check that the object is callable, i.e. a function
+                    return getattr(module, func, None)
+                else:
+                    return f"Object '{func}' found in module '{func_to_check['module']}' but it is not callable"
+            else:
+                return f"Module '{module}' found but not function '{func}'"
+        else:  # Try to import module
+            if os.path.isfile(module):  # If module is a file path
+                module_path = os.path.dirname(module)  # Get path to file
+                module = os.path.splitext(os.path.basename(module))[0]  # Get name of module
+                sys.path.insert(0, module_path)  # Add the path to the working directory
+            module = importlib.import_module(module, package=None)
+            if hasattr(module, func):  # Check if object exists within the module
+                if callable(getattr(module, func, None)):  # Check that the object is callable, i.e. a function
+                    return getattr(module, func, None)
+                else:
+                    return f"Object '{func}' found in LOADED module '{func_to_check['module']}' but it is not callable"
+            else:
+                return f"Module '{module}' LOADED but function '{func}' not found"
+
+
+def temp_analysis_func():
+    print("This is just here to give the import profiles something to point at until there's a proper target")
 
 
 def main():
