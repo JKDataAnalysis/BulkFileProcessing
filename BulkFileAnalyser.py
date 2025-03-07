@@ -7,20 +7,12 @@ TODO
     Import_test
     * Add validation of selected source profile
         - Must contain filetype, read_file_module and read_file_func and have import_settings (even if empty)
+        - Module/func references must be valid
+            - These are currently checked when analysis is run but this should be when a source is selected
     * Add pre-processing function as for file read function to allow option to clean up files before trying to read them
     * Add dtype to Tekscan profile and see if the file read falls over
         - also add to Bioware profile
-    =====
-    Major
-    =====
-    * Create window to run analysis- just show progress bar and label
-        - Once complete show options for results- save as / view
-    * Add results of processing to results df
-    * Write results df to file
-    * Clear cue
-    =====
-    Minor
-    =====
+    * Clear cue after analysis completes
     * padx and pady values are currently set within the classes rather than being passed to them
         - Look at creating a style and setting to widgets
     * Vertical scroll bar on edit files listbox should only display if the number of files displayed is greater than the
@@ -118,8 +110,7 @@ class BuildCue(tk.Frame):
         self.add_files_btn = ttk.Button(
             self.choose_data_source_type_lblfrm,
             text="Add import profile",
-            command=lambda: print("Does nowt yet")
-        )
+            state=tk.DISABLED)
         self.add_files_btn.pack(padx=pdx, pady=pdy, side=tk.LEFT, anchor=tk.NE)
 
         # Create a frame for file cue widgets
@@ -189,7 +180,39 @@ class BuildCue(tk.Frame):
         # Set window to initial conditions
         self.reset_window()
 
+    def check_import_profile(self, import_settings):
+        """
+        Add call to check key functions
+        Add call to check passed functions are valid
+        """
+        :param import_settings:
+        :return:
+
+        module = file_import_settings['read_file_func']['module']
+        fnc = file_import_settings['read_file_func']['func']
+        read_file_func_valid = False
+        if module == "LOCAL":
+            if fnc in globals():
+                read_file_func_valid = True
+                read_file_func = eval(fnc)
+        else:
+            if hasattr(module, fnc):
+                read_file_func_valid = True
+                read_file_func = getattr(module, fnc)
+        if read_file_func_valid:
+
+    # app = sys.modules[file_import_settings['read_file_func']['module']]
+    # # if file_import_settings['read_file_func']['module'] == __name__:
+    # #     app = sys.modules[file_import_settings['read_file_func']['module']]
+    # # else:  # If calling this file from another one
+    # #     print("globals")
+    # #     app = file_import_settings['read_file_func']['module']
+    #     # app = globals()[file_import_settings['read_file_func']['module']]
+    #
+    # if hasattr(app, f):  # Function exists
+
     def source_type_selected(self, event):
+        self.check_import_profile(self.file_import_settings)
         event.widget['state'] = tk.DISABLED  # Disable changing file type
         # Enable adding files/ folders and whether subfolders are to be included
         self.add_files_btn['state'] = tk.NORMAL
@@ -465,28 +488,6 @@ class RunAnalysis(tk.Toplevel):
         close_btn = Button(self, text="Close", command=self.analysis_complete, state=tk.DISABLED)
         close_btn.pack(padx=pdx, pady=pdy)
 
-        # Set read file function from details read from import settings file
-        module = file_import_settings['read_file_func']['module']
-        fnc = file_import_settings['read_file_func']['func']
-        read_file_func_valid = False
-        if module == "LOCAL":
-            if fnc in globals():
-                read_file_func_valid = True
-                read_file_func = eval(fnc)
-        else:
-            if hasattr(module, fnc):
-                read_file_func_valid = True
-                read_file_func = getattr(module, fnc)
-        if read_file_func_valid:
-            # app = sys.modules[file_import_settings['read_file_func']['module']]
-            # # if file_import_settings['read_file_func']['module'] == __name__:
-            # #     app = sys.modules[file_import_settings['read_file_func']['module']]
-            # # else:  # If calling this file from another one
-            # #     print("globals")
-            # #     app = file_import_settings['read_file_func']['module']
-            #     # app = globals()[file_import_settings['read_file_func']['module']]
-            #
-            # if hasattr(app, f):  # Function exists
             #     read_file_func = getattr(app, f)  # Set as read file function
             #     # Iterate through each file in cue and process
             all_results_list = []  # Create empty list for storing list of dicts of all results
