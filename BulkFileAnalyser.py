@@ -3,16 +3,15 @@ TODO
     ====
     NEXT
     ====
-    * Get read file function selection to work when calling functions from outside of this script. See notes in
-    Import_test
-    * Add validation of selected source profile
-        - Must contain filetype, read_file_module and read_file_func and have import_settings (even if empty)
-        - Module/func references must be valid
-            - These are currently checked when analysis is run but this should be when a source is selected
-    * Add pre-processing function as for file read function to allow option to clean up files before trying to read them
+    * Move validation of selected source profile (Check_import_settings) into this file to be run when a source
+     is selected
+     * Remove existing validation code when analysis is run
+    =====
+    Later
+    =====
     * Add dtype to Tekscan profile and see if the file read falls over
         - also add to Bioware profile
-    * Clear cue after analysis completes
+    * Optionally Clear cue after analysis completes
     * padx and pady values are currently set within the classes rather than being passed to them
         - Look at creating a style and setting to widgets
     * Vertical scroll bar on edit files listbox should only display if the number of files displayed is greater than the
@@ -180,36 +179,8 @@ class BuildCue(tk.Frame):
         # Set window to initial conditions
         self.reset_window()
 
-    def check_import_profile(self, import_settings):
-        """
-        Add call to check key functions
-        Add call to check passed functions are valid
-        """
-        :param import_settings:
-        :return:
-
-        module = file_import_settings['read_file_func']['module']
-        fnc = file_import_settings['read_file_func']['func']
-        read_file_func_valid = False
-        if module == "LOCAL":
-            if fnc in globals():
-                read_file_func_valid = True
-                read_file_func = eval(fnc)
-        else:
-            if hasattr(module, fnc):
-                read_file_func_valid = True
-                read_file_func = getattr(module, fnc)
-        if read_file_func_valid:
-
-    # app = sys.modules[file_import_settings['read_file_func']['module']]
-    # # if file_import_settings['read_file_func']['module'] == __name__:
-    # #     app = sys.modules[file_import_settings['read_file_func']['module']]
-    # # else:  # If calling this file from another one
-    # #     print("globals")
-    # #     app = file_import_settings['read_file_func']['module']
-    #     # app = globals()[file_import_settings['read_file_func']['module']]
-    #
-    # if hasattr(app, f):  # Function exists
+    def check_import_profile(self):
+        print("Add code here")
 
     def source_type_selected(self, event):
         self.check_import_profile(self.file_import_settings)
@@ -488,34 +459,25 @@ class RunAnalysis(tk.Toplevel):
         close_btn = Button(self, text="Close", command=self.analysis_complete, state=tk.DISABLED)
         close_btn.pack(padx=pdx, pady=pdy)
 
-            #     read_file_func = getattr(app, f)  # Set as read file function
-            #     # Iterate through each file in cue and process
-            all_results_list = []  # Create empty list for storing list of dicts of all results
-            for file in passed_file_list:
-                data_df = read_file_func(file, file_import_settings["import_param"])
-                file_results_dict = {
-                    "Filename": os.path.splitext(os.path.basename(file))[0],
-                    "Path": os.path.dirname(file),
-                    "Rows": data_df.shape[0],
-                    "Columns": data_df.shape[1]
-                }
-                # print("BulkFileAnalyser", hasattr(sys.modules["__name__"], "analysis"))
-                all_results_list.append(file_results_dict)  # Add results from file to list of dicts
+        #     # Iterate through each file in cue and process
+        all_results_list = []  # Create empty list for storing list of dicts of all results
+        for file in passed_file_list:
+            data_df = read_file_func(file, file_import_settings["import_param"])
+            file_results_dict = {
+                "Filename": os.path.splitext(os.path.basename(file))[0],
+                "Path": os.path.dirname(file),
+                "Rows": data_df.shape[0],
+                "Columns": data_df.shape[1]
+            }
+            # print("BulkFileAnalyser", hasattr(sys.modules["__name__"], "analysis"))
+            all_results_list.append(file_results_dict)  # Add results from file to list of dicts
             results_df = pd.DataFrame(all_results_list)  # Convert list to df
             print(results_df)
             save_df_to_file(results_df)
 
             self.analysis_complete()
             return
-        else:
-            messagebox.showerror(
-                title="File read function not recognised",
-                message="Aborting: File read function not recognised",
-                detail="Module: " + module + "\n\nFunction: " + fnc,
-                icon='error'
-            )
-            temp_lbl['text'] = "Analysis aborted"
-            close_btn['state'] = tk.NORMAL  # Processing complete. Allow user to close window
+
 
         # The following commands keep the popup on top and stop clicking on the main window during editing
         self.transient(master)  # set to be on top of the main window
@@ -544,3 +506,14 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+"""
+        else:
+            messagebox.showerror(
+                title="File read function not recognised",
+                message="Aborting: File read function not recognised",
+                detail="Module: " + module + "\n\nFunction: " + fnc,
+                icon='error'
+            )
+            temp_lbl['text'] = "Analysis aborted"
+            close_btn['state'] = tk.NORMAL  # Processing complete. Allow user to close window"""

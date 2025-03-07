@@ -154,15 +154,15 @@ def main():
 
     # Filter dictionary keys for only those that end in '_func'
     func_dict = {k: v for k, v in selected_import_settings.items() if k.endswith('_func')}
-    functns = check_import_setting_func(func_dict)
-    if not isinstance(functns, dict):
-        print("Function error:", functns)
+    file_handling_funcs = check_import_setting_func(func_dict)
+    if not isinstance(file_handling_funcs, dict):
+        print("Function error:", file_handling_funcs)
     else:
         print('Functions OK')
 
         # Functions can now be called by filtering the dictionary for the required key/ value pair as:
-        functns['read_file_func']()
-        functns['analysis_func']()
+        file_handling_funcs['read_file_func']()
+        file_handling_funcs['analysis_func']()
 
 
 if __name__ == '__main__':
