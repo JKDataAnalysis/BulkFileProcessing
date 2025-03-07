@@ -1,0 +1,26 @@
+The following are required key/ value pairs in the JSON file for each defined data file import profile:
+
+{
+  "file_type": ["type", "label"],
+  "clean_file_func": ["module", "func"],
+  "read_file_func": ["module", "func"],
+  "analysis_func": ["module", "func"],
+  "import_param": []
+}
+
+file_type: type: The file extension (without '.' that data files are expected to have, e.g. 'txt' or 'csv'
+file_type: label: The label to be appear in the file type combobox when selcting files to add to the cue
+
+clean_file_func: A function to be called to carry out cleaning of each file before they are read in. If no pre-clean function needs to be applied then value for 'func' should be an empty string. The function must accept the file path to each file as a string and return the file path to the cleaned version.
+
+read_file_func: The function to use to read in the data file. This can be anything that will return the data as a Pandas Dataframe
+
+analysis_func: The function that will be used to conduct the analysis. The function must accept a dataframe of the data read from each file as a positional argument. It must return a dictionary of key/ value pairs as "column name": value. Any number of key/ value pairs can be returned.
+
+Acceptable formats for modules
+The value for modules for each of the functions can be of any of the following formats:
+  * "": This denotes that the function to be used is within the BulkFileAnalyser file, e.g. 'read_text_file' 
+  * module name: If the module is within the project folder. If the module isn't imported within BulkFileAnalyser, the calling script or one imported into it, the script will attempt to import it, e.g. 'pandas'
+  * A file path: e.g. '/home/user/.config/JetBrains/PyCharmCE2024.3/scratches/AnalysisFunctions.py'
+
+import_param: these parameters will be passed to the read file function defined in 'read_file_func'. These should be key/ value pairs where the key matches the relevant parameters expected by the read file function. Any number of parameters can be included. If no parameters are required the value for this key/ value pair should be an empty list '[]'.
