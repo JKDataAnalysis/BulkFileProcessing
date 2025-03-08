@@ -3,11 +3,7 @@ TODO
     ====
     NEXT
     ====
-    * Sort error handling if key or function errors found
-        - messagebox rather than print
-        - Remove source type
-    * Move validation of selected source profile (Check_import_settings) into this file to be run when a source
-     is selected
+
     =====
     Later
     =====
@@ -192,7 +188,6 @@ class BuildCue(tk.Frame):
             "import_param": []
         }
 
-
         # Check selected dictionary against required keys
         key_error = self.check_import_setting_keys(selected_import_settings, required_keys_list)
         if key_error:
@@ -200,15 +195,11 @@ class BuildCue(tk.Frame):
 
         # Filter dictionary keys for only those that end in '_func'
         func_dict = {k: v for k, v in selected_import_settings.items() if k.endswith('_func')}
-        self.file_handling_funcs = self.check_import_setting_func(func_dict)
-        if not isinstance(self.file_handling_funcs, dict):
-            print("Function error:", self.file_handling_funcs)
-        else:
-            print('Functions OK')
+        return self.check_import_setting_func(func_dict)
 
-            # # Functions can now be called by filtering the dictionary for the required key/ value pair as:
-            # self.file_handling_funcs['read_file_func']()
-            # self.file_handling_funcs['analysis_func']()
+        # # Functions can now be called by filtering the dictionary for the required key/ value pair as:
+        # self.file_handling_funcs['read_file_func']()
+        # self.file_handling_funcs['analysis_func']()
 
     def source_type_selected(self, event):
         # Get the source file type selected in the combo box
@@ -217,17 +208,33 @@ class BuildCue(tk.Frame):
         # Get the import settings for the selected source file type
         self.file_import_settings = self.data_file_defs[selected_data_source]
 
-        source_error = self.check_import_profile(self.file_import_settings)
-
-        event.widget['state'] = tk.DISABLED  # Disable changing file type
-        # Enable adding files/ folders and whether subfolders are to be included
-        self.add_files_btn['state'] = tk.NORMAL
-        self.add_folder_btn['state'] = tk.NORMAL
-        self.include_subdir_chk['state'] = tk.NORMAL
+        functions = self.check_import_profile(self.file_import_settings)
+        if not isinstance(functions, dict):  # Did not successfully return functions
+            messagebox.showerror(
+                title="Source profile error",
+                message="Error in selected source profile\nProfile will be disabled",
+                detail=functions,
+                icon='error')
+            # print(self.source_type_combo.delete(self.source_type_combo.get())
+            tmp_list = list(self.source_type_combo['values'])  # Convert to list so can edit
+            tmp_list.remove(selected_data_source)  # Remove selected item
+            self.source_type_combo['values'] = tuple(tmp_list)  # Convert back to tuple and reassign
+            self.source_type_combo.set('')  # Clear selection
+            if len(self.source_type_combo['values']) == 0:  # If no options left
+                messagebox.showerror(
+                    title="No valid source profiles",
+                    message="There are no valid source profiles available\nUnable to continue",
+                    icon='error')
+                self.quit_script()
+        else:  # All ok, enable next steps
+            event.widget['state'] = tk.DISABLED  # Disable changing file type
+            # Enable adding files/ folders and whether subfolders are to be included
+            self.add_files_btn['state'] = tk.NORMAL
+            self.add_folder_btn['state'] = tk.NORMAL
+            self.include_subdir_chk['state'] = tk.NORMAL
+            self.file_handling_funcs = functions
 
     def add_files_btns_clicked(self, path_type):
-
-
         if path_type == "files":  # Add files button clicked
             self.add_files(
                 self.file_import_settings["file_type"]["type"],
@@ -350,6 +357,7 @@ class BuildCue(tk.Frame):
         self.include_subdir_chk['state'] = tk.DISABLED  # Disable include subfolders checkbox
         self.edit_files_btn['state'] = tk.DISABLED  # Disable view/ edit file cue button
         self.run_analysis_btn['state'] = tk.DISABLED  # Disable run analysis button
+        self.source_type_combo.set('')  # Remove any selection
 
     def edit_cue_clicked(self):
         # self.file_cue_window.title('File cue')
@@ -493,7 +501,7 @@ def save_df_to_file(df, dflt_ext='.csv', incl_index=False, confirm_overwrite=Tru
         filename = fd.asksaveasfilename(confirmoverwrite=confirm_overwrite, defaultextension=dflt_ext)
         if filename:  # Will evaluate as True if a filename is returned
             df.to_csv(filename, index=incl_index)
-            print('Results file saved to:',filename)
+            print('Results file saved to:', filename)
             saved_file = True
         else:  # Will evaluate as False if the string is empty (user clicked Cancel)
             ans = messagebox.askretrycancel(
@@ -539,7 +547,6 @@ class RunAnalysis(tk.Toplevel):
 
             self.analysis_complete()
             return
-
 
         # The following commands keep the popup on top and stop clicking on the main window during editing
         self.transient(master)  # set to be on top of the main window
@@ -619,12 +626,10 @@ if __name__ == '__main__':
     main()
 
 """
-        else:
-            messagebox.showerror(
-                title="File read function not recognised",
-                message="Aborting: File read function not recognised",
-                detail="Module: " + module + "\n\nFunction: " + fnc,
+      messagebox.showerror(
+                title="Source profile error",
+                message="Error in selected source profile",
+                detail=self.file_handling_funcs,
                 icon='error'
             )
-            temp_lbl['text'] = "Analysis aborted"
-            close_btn['state'] = tk.NORMAL  # Processing complete. Allow user to close window"""
+"""

@@ -42,7 +42,7 @@
             },
             "analysis_func": {
                   "module": "",
-                  "func": ""
+                  "func": "temp_analysis_func"
             },
             "import_param": {
                   "sep": "\t",
