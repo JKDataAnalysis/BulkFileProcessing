@@ -1,5 +1,5 @@
 {
-      "Tekscan Footscan SAM (text)": {
+      "Balance analysis: Tekscan Footscan SAM (text file)": {
             "file_type": {
                   "type": "csv",
                   "label": "Tekscan SAM"
@@ -39,7 +39,7 @@
                   }
             }
       },
-      "Kistler Bioware (text)": {
+      "Balance analysis: Kistler Bioware (text fle)": {
             "file_type": {
                   "type": "txt",
                   "label": "Kistler Bioware"

@@ -3,8 +3,7 @@ TODO
     ====
     NEXT
     ====
-    * Optionally Clear cue after analysis completes
-    * Add some example analyses: Need to think about how to handle this. Should analyses be fixed for source types
+    * Add some example analyses: Need to think about how to handle this. Should analyses be fixed for analysis types
     (e.g. balance for Tekscan or balance or jump for Bioware?) or should this be separate?
     =====
     Later
@@ -24,9 +23,12 @@ TODO
     certainly not as part of this script. Do need to make the script more robust in handling such errors though as they
     could be encountered in other files
     * reading in delim file is not very robust. Will make a mess of whole import if there's a missing values
+    * Frames within main window do not expand if the window is expanded (probably should disable resizing for other
+    windows)
 """
 
 import tkinter as tk
+from json import JSONDecodeError
 from tkinter import filedialog as fd
 from tkinter import messagebox
 from tkinter import ttk
@@ -40,39 +42,42 @@ import json
 import importlib
 
 
-def get_file_definitions():
+def get_analysis_profiles():
     # Set file to default location and name
-    data_def_file = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), "DataFileImportSettings.json")
-    if os.path.exists(data_def_file):  # If the default file exists
-        with open(data_def_file, "r") as fp:
-            data_file_defs = json.load(fp)
+    analysis_profiles_file = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), "DataFileImportSettings.json")
+    if os.path.exists(analysis_profiles_file):  # If the default file exists
+        with open(analysis_profiles_file, "r") as fp:
+            try:
+                data_file_defs = json.load(fp)
+            except JSONDecodeError:
+                return ('error', {
+                    'message': 'Aborting: Reading JSON format information from analysis profile file failed',
+                    'detail': 'Search path:\n' + analysis_profiles_file
+                })
+            except Exception as e:
+                print(str(e))
+                return ('error', {
+                    'message': 'Aborting: Unhandled error reading JSON format information from analysis profile file',
+                    'detail': 'Search path:\n' + analysis_profiles_file
+                })
         if isinstance(data_file_defs, dict):  # If have successfully read in dictionary
             if len(list(data_file_defs.keys())) >= 1:  # If there is at least one defined type
                 return data_file_defs
             else:
-                messagebox.showerror(
-                    title="Failed to read data file definitions",
-                    message="Aborting: No data file definitions found",
-                    detail="Search path:\n" + data_def_file,
-                    icon='error'
-                )
-                return -3
+                return ('error', {
+                    'message': 'Aborting: No analysis definitions found in file',
+                    'detail': 'Search path:\n' + analysis_profiles_file
+                })
         else:
-            messagebox.showerror(
-                title="Failed to read data file definitions",
-                message="Aborting: Error reading data file definitions",
-                detail="Search path:\n" + data_def_file,
-                icon='error'
-            )
-            return -2
+            return ('error', {
+                'message': 'Aborting: Error reading analysis definitions',
+                'detail': 'Search path:\n' + analysis_profiles_file
+            })
     else:
-        messagebox.showerror(
-            title="Failed to read data file definitions",
-            message="Aborting: No data file definitions found",
-            detail="Search path:\n" + data_def_file,
-            icon='error'
-        )
-        return -1
+        return ('error', {
+            'message': 'Aborting: No analysis definitions file found',
+            'detail': 'Search path:\n' + analysis_profiles_file
+        })
 
 
 class BuildCue(tk.Frame):
@@ -88,35 +93,35 @@ class BuildCue(tk.Frame):
         pdx = 5
         pdy = 5
 
-        # create choose source data file type label
-        self.choose_data_source_type_lblfrm = LabelFrame(self, text="Data file import profile")
-        self.choose_data_source_type_lblfrm.pack(padx=pdx, pady=pdy, side=tk.TOP, anchor=tk.NW)
+        # create choose analysis type label
+        self.choose_data_analysis_type_lblfrm = LabelFrame(self, text="Analysis type profile")
+        self.choose_data_analysis_type_lblfrm.pack(padx=pdx, pady=pdy, side=tk.TOP, anchor=tk.NW, fill='x', expand=True)
 
-        # create combobox object to select data file type
-        defined_sources = tk.StringVar()
-        self.source_type_combo = ttk.Combobox(
-            self.choose_data_source_type_lblfrm,
-            textvariable=defined_sources,
+        # create combobox object to select analysis type
+        defined_analyses = tk.StringVar()
+        self.analysis_type_combo = ttk.Combobox(
+            self.choose_data_analysis_type_lblfrm,
+            textvariable=defined_analyses,
             state='readonly')
-        self.source_type_combo['values'] = list(self.data_file_defs.keys())
-        self.source_type_combo.set("Choose data file type")
-        self.source_type_combo.pack(padx=pdx, pady=pdy, side=tk.LEFT, anchor=tk.NW)
-        self.source_type_combo.bind('<<ComboboxSelected>>', self.source_type_selected)
+        self.analysis_type_combo['values'] = list(self.data_file_defs.keys())
+        self.analysis_type_combo.set("Choose analysis type")
+        self.analysis_type_combo.pack(padx=pdx, pady=pdy, side=tk.LEFT, anchor=tk.NW, fill='x', expand=True)
+        self.analysis_type_combo.bind('<<ComboboxSelected>>', self.analysis_type_selected)
 
         # create button to add import profile
         self.add_files_btn = ttk.Button(
-            self.choose_data_source_type_lblfrm,
+            self.choose_data_analysis_type_lblfrm,
             text="Add import profile",
             state=tk.DISABLED)
         self.add_files_btn.pack(padx=pdx, pady=pdy, side=tk.LEFT, anchor=tk.NE)
 
         # Create a frame for file cue widgets
         data_files_lblfrm = LabelFrame(self, text="File cue")
-        data_files_lblfrm.pack(padx=pdx, pady=pdy, side=tk.TOP, anchor=tk.NW)
+        data_files_lblfrm.pack(padx=pdx, pady=pdy, side=tk.TOP, anchor=tk.NW, fill='x', expand=True)
 
-        # Create a frame for build cue buttons
+        # Create a frame for build cue buttons and subfolder checkbox
         build_cue_btn_frm = Frame(data_files_lblfrm)
-        build_cue_btn_frm.pack(padx=pdx, pady=pdy, side=tk.TOP, anchor=tk.NW)
+        build_cue_btn_frm.pack(padx=pdx, pady=pdy, side=tk.TOP, anchor=tk.NW, fill='x', expand=True)
 
         # create button to add files
         self.add_files_btn = ttk.Button(
@@ -152,6 +157,7 @@ class BuildCue(tk.Frame):
         self.cued_file_count_lbl.pack(padx=pdx, pady=pdy, side=tk.BOTTOM, anchor=tk.NW)
         self.update_cue_count_lbl()
 
+        # Create a frame for the main buttons (quit, reset, run analysis)
         main_btn_frame = tk.Frame(self)
         main_btn_frame.pack(side=tk.BOTTOM)
 
@@ -198,29 +204,29 @@ class BuildCue(tk.Frame):
         # self.file_handling_funcs['read_file_func']()
         # self.file_handling_funcs['analysis_func']()
 
-    def source_type_selected(self, event):
-        # Get the source file type selected in the combo box
-        selected_data_source = self.source_type_combo.get()
+    def analysis_type_selected(self, event):
+        # Get the analysis type selected in the combo box
+        selected_analysis_type = self.analysis_type_combo.get()
 
-        # Get the import settings for the selected source file type
-        self.file_import_settings = self.data_file_defs[selected_data_source]
+        # Get the import settings for the selected analysis type
+        self.file_import_settings = self.data_file_defs[selected_analysis_type]
 
         functions = self.check_import_profile(self.file_import_settings)
         if not isinstance(functions, dict):  # Did not successfully return functions
             messagebox.showerror(
-                title="Source profile error",
-                message="Error in selected source profile\nProfile will be disabled",
+                title="Analysis type profile error",
+                message="Error in selected analysis type specifications\nAnalysis type will be disabled",
                 detail=functions,
                 icon='error')
-            # print(self.source_type_combo.delete(self.source_type_combo.get())
-            tmp_list = list(self.source_type_combo['values'])  # Convert to list so can edit
-            tmp_list.remove(selected_data_source)  # Remove selected item
-            self.source_type_combo['values'] = tuple(tmp_list)  # Convert back to tuple and reassign
-            self.source_type_combo.set('')  # Clear selection
-            if len(self.source_type_combo['values']) == 0:  # If no options left
+
+            tmp_list = list(self.analysis_type_combo['values'])  # Convert to list so can edit
+            tmp_list.remove(selected_analysis_type)  # Remove selected item
+            self.analysis_type_combo['values'] = tuple(tmp_list)  # Convert back to tuple and reassign
+            self.analysis_type_combo.set('')  # Clear selection
+            if len(self.analysis_type_combo['values']) == 0:  # If no options left
                 messagebox.showerror(
-                    title="No valid source profiles",
-                    message="There are no valid source profiles available\nUnable to continue",
+                    title="No valid analysis profiles",
+                    message="There are no valid analysis profiles available\nUnable to continue",
                     icon='error')
                 self.quit_script()
         else:  # All ok, enable next steps
@@ -313,7 +319,7 @@ class BuildCue(tk.Frame):
             return
         self.add_files_to_cue(selected_file_list)  # Remove duplicates and update count
 
-    def add_folder(self,  file_type):
+    def add_folder(self, file_type):
         default_dir = '/home/jon/Documents/TestData/RecentData'
         selected_folder = fd.askdirectory(
             title='Open files',
@@ -343,18 +349,27 @@ class BuildCue(tk.Frame):
             self.file_import_settings,
             self.file_handling_funcs,
             self)
+        ans = messagebox.askyesno(
+            title='Clear file cue',
+            message='Clear files from cue?')
+        if ans:
+            self.cued_file_list = tuple()  # Clear the file cue
+            self.cued_file_count = 0  # Reset file counter
+            self.update_cue_count_lbl()  # Update the displayed value
+            self.edit_files_btn['state'] = tk.DISABLED  # Disable view/ edit file cue button
+            self.run_analysis_btn['state'] = tk.DISABLED  # Disable run analysis button
 
     def reset_window(self):
         self.cued_file_list = tuple()  # Clear the file cue
         self.cued_file_count = 0  # Reset file counter
         self.update_cue_count_lbl()  # Update the displayed value
-        self.source_type_combo['state'] = tk.NORMAL  # Reactivate file type combo box
+        self.analysis_type_combo['state'] = tk.NORMAL  # Reactivate file type combo box
+        self.analysis_type_combo.set('')  # Remove any selection
         self.add_files_btn['state'] = tk.DISABLED  # Disable add files button
         self.add_folder_btn['state'] = tk.DISABLED  # Disable add folder button
         self.include_subdir_chk['state'] = tk.DISABLED  # Disable include subfolders checkbox
         self.edit_files_btn['state'] = tk.DISABLED  # Disable view/ edit file cue button
         self.run_analysis_btn['state'] = tk.DISABLED  # Disable run analysis button
-        self.source_type_combo.set('')  # Remove any selection
 
     def edit_cue_clicked(self):
         # self.file_cue_window.title('File cue')
@@ -378,6 +393,7 @@ class BuildCue(tk.Frame):
 
 class EditCue(tk.Toplevel):
     """modal window requires a master"""
+
     def __init__(self, passed_file_list, master, **kwargs):
         super().__init__(master, **kwargs)
 
@@ -478,16 +494,23 @@ class EditCue(tk.Toplevel):
 
 
 def read_text_file(file, import_settings):
+    df = ""  # Unlikely to get to referencing this with error handling below but set just to avoid exceptions
     if os.path.exists(file):  # If the file exists
-        df = pd.read_csv(
-            file,
-            on_bad_lines="warn",
-            **import_settings
-        )
-        if isinstance(df, pd.DataFrame):
-            return df
-        else:
-            return "Could not read file"
+        try:
+            df = pd.read_csv(
+                file,
+                on_bad_lines="warn",
+                **import_settings
+            )
+        except Exception as e:
+            print('Error reading:', file, '/nError details:', repr(e))
+            return type(e).__name__
+        else: # Read OK
+            if isinstance(df, pd.DataFrame):
+                return df
+            else:
+                print('Read error: Not returned as Dataframe', file)  # Wouldn't expect to get here
+                return 'Read did not produce Dataframe'
     else:
         return "File not found"
 
@@ -497,8 +520,32 @@ def save_df_to_file(df, dflt_ext='.csv', incl_index=False, confirm_overwrite=Tru
     while not saved_file:
         filename = fd.asksaveasfilename(confirmoverwrite=confirm_overwrite, defaultextension=dflt_ext)
         if filename:  # Will evaluate as True if a filename is returned
-            df.to_csv(filename, index=incl_index)
-            print('Results file saved to:', filename)
+            try:
+                df.to_csv(filename, index=incl_index)
+            except UnicodeError as e:
+                messagebox.showerror(
+                    Title='Error saving file',
+                    message='The results DataFrame contains characters that cannot be encoded in the default encoding',
+                    detail=e)
+            except ValueError as e:
+                messagebox.showerror(
+                    Title='Error saving file',
+                    message='Value error. This can arise if the results Dataframe contains separator characters or ' +
+                            'very large integers.',
+                    detail=e)
+            except MemoryError as e:
+                messagebox.showerror(
+                    Title='Error saving file',
+                    message='Memory error. This can arise if the results Dataframe ' +
+                            'is too large to fit into available memory during the saving process.',
+                    detail=e)
+            except Exception as e:
+                messagebox.showerror(
+                    Title='Error saving file',
+                    message='Unhandled error.',
+                    detail=e)
+            else:
+                print('Results file saved to:', filename)
             saved_file = True
         else:  # Will evaluate as False if the string is empty (user clicked Cancel)
             ans = messagebox.askretrycancel(
@@ -511,6 +558,7 @@ def save_df_to_file(df, dflt_ext='.csv', incl_index=False, confirm_overwrite=Tru
 
 class RunAnalysis(tk.Toplevel):
     """modal window requires a master"""
+
     def __init__(self, passed_file_list, file_import_settings, file_handling_funcs, master, **kwargs):
         super().__init__(master, **kwargs)
 
@@ -537,10 +585,22 @@ class RunAnalysis(tk.Toplevel):
             data_df = read_file_function(file, read_file_parameters)
             file_results_dict = {
                 "Filename": os.path.splitext(os.path.basename(file))[0],
-                "Path": os.path.dirname(file),
-                "Rows": data_df.shape[0],
-                "Columns": data_df.shape[1]
+                "Path": os.path.dirname(file)
             }
+            if isinstance(data_df, pd.DataFrame):  # If successfully read in data
+                read_success_dict = {
+                    "Read OK": "OK",
+                    "Rows": data_df.shape[0],
+                    "Columns": data_df.shape[1]
+                    }
+            else:
+                read_success_dict = {
+                    "Read OK": 'FAIL: ' + data_df,
+                    "Rows": 0,
+                    "Columns": 0
+                    }
+            file_results_dict.update(read_success_dict)
+
             all_results_list.append(file_results_dict)  # Add results from file to list of dicts
         results_df = pd.DataFrame(all_results_list)  # Convert list to df
         save_df_to_file(results_df)
@@ -549,13 +609,11 @@ class RunAnalysis(tk.Toplevel):
         # Its included with an if statement so that the lines below don't report as being unreachable
         # In theory, a situation could arise where the window fails to close and then it would hit the last lines and
         # reach an error state
-        if not self.winfo_exists():
-            return
-
-        # The following commands keep the popup on top and stop clicking on the main window during editing
-        self.transient(master)  # set to be on top of the main window
-        self.grab_set()  # hijack all commands from the master (clicks on the main window are ignored)
-        master.wait_window(self)  # pause anything on the main window until this one closes
+        if self.winfo_exists():
+            # The following commands keep the popup on top and stop clicking on the main window during editing
+            self.transient(master)  # set to be on top of the main window
+            self.grab_set()  # hijack all commands from the master (clicks on the main window are ignored)
+            master.wait_window(self)  # pause anything on the main window until this one closes
 
     def analysis_complete(self):
         # Blows up with destroy if called directly from __init__ but not from a button command. Need to figure out why
@@ -612,10 +670,10 @@ def temp_analysis_func():
 
 
 def main():
-    # Get data file definitions
-    data_file_definitions = get_file_definitions()  # Read in data file specifications
-
-    if isinstance(data_file_definitions, dict):  # If script has returned a df rather than error code (integer)
+    # Get analysis definitions
+    data_file_definitions = get_analysis_profiles()  # Read in analysis specifications
+    if isinstance(data_file_definitions,
+                  dict):  # If script has returned a dict rather than an error (returned as tuple)
         # create root window.
         root = tk.Tk()
         root.title("Bulk file analyser")
@@ -623,17 +681,12 @@ def main():
         window.pack()
         root.mainloop()
     else:
+        messagebox.showerror(
+            title="Failed to read analysis definitions",
+            icon='error',
+            **data_file_definitions[1])
         exit()
 
 
 if __name__ == '__main__':
     main()
-
-"""
-      messagebox.showerror(
-                title="Source profile error",
-                message="Error in selected source profile",
-                detail=self.file_handling_funcs,
-                icon='error'
-            )
-"""
