@@ -3,13 +3,12 @@ TODO
     ====
     NEXT
     ====
-
+    * Optionally Clear cue after analysis completes
+    * Add some example analyses: Need to think about how to handle this. Should analyses be fixed for source types
+    (e.g. balance for Tekscan or balance or jump for Bioware?) or should this be separate?
     =====
     Later
     =====
-    * Add dtype to Tekscan profile and see if the file read falls over
-        - also add to Bioware profile
-    * Optionally Clear cue after analysis completes
     * padx and pady values are currently set within the classes rather than being passed to them
         - Look at creating a style and setting to widgets
     * Vertical scroll bar on edit files listbox should only display if the number of files displayed is greater than the
@@ -182,11 +181,9 @@ class BuildCue(tk.Frame):
         # Dictionary of keys that selected import settings must contain to be valid
         required_keys_list = {
             "file_type": ["type", "label"],
-            "clean_file_func": ["module", "func"],
-            "read_file_func": ["module", "func"],
-            "analysis_func": ["module", "func"],
-            "import_param": []
-        }
+            "clean_file_func": ["module", "func", "parameters"],
+            "read_file_func": ["module", "func", "parameters"],
+            "analysis_func": ["module", "func", "parameters"]}
 
         # Check selected dictionary against required keys
         key_error = self.check_import_setting_keys(selected_import_settings, required_keys_list)
@@ -531,10 +528,13 @@ class RunAnalysis(tk.Toplevel):
         close_btn = Button(self, text="Close", command=self.analysis_complete, state=tk.DISABLED)
         close_btn.pack(padx=pdx, pady=pdy)
 
-        #     # Iterate through each file in cue and process
+        # Iterate through each file in cue and process
         all_results_list = []  # Create empty list for storing list of dicts of all results
+        read_file_function = self.file_handling_funcs['read_file_func']
+        read_file_parameters = file_import_settings["read_file_func"]["parameters"]
         for file in passed_file_list:
-            data_df = self.file_handling_funcs['read_file_func'](file, file_import_settings["import_param"])
+            # read_file_function is read from JSON file so won't exist in script
+            data_df = read_file_function(file, read_file_parameters)
             file_results_dict = {
                 "Filename": os.path.splitext(os.path.basename(file))[0],
                 "Path": os.path.dirname(file),
@@ -542,10 +542,14 @@ class RunAnalysis(tk.Toplevel):
                 "Columns": data_df.shape[1]
             }
             all_results_list.append(file_results_dict)  # Add results from file to list of dicts
-            results_df = pd.DataFrame(all_results_list)  # Convert list to df
-            save_df_to_file(results_df)
-
-            self.analysis_complete()
+        results_df = pd.DataFrame(all_results_list)  # Convert list to df
+        save_df_to_file(results_df)
+        self.analysis_complete()
+        # analysis_complete destroys this window so this prevents errors when it hits lines below
+        # Its included with an if statement so that the lines below don't report as being unreachable
+        # In theory, a situation could arise where the window fails to close and then it would hit the last lines and
+        # reach an error state
+        if not self.winfo_exists():
             return
 
         # The following commands keep the popup on top and stop clicking on the main window during editing

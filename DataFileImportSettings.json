@@ -6,15 +6,27 @@
             },
             "clean_file_func": {
                   "module": "",
-                  "func": ""
+                  "func": "",
+                  "parameters": {}
             },
             "read_file_func": {
                   "module": "",
-                  "func": "read_text_file"
+                  "func": "read_text_file",
+                   "parameters": {
+                        "sep": ",",
+                        "header": 8,
+                        "engine": "python",
+                        "skipfooter": 4,
+                        "dtype": {
+                              "Time": "float",
+                              "Frame": "int"
+                        }
+                  }
             },
             "analysis_func": {
                   "module": "",
-                  "func": "temp_analysis_func"
+                  "func": "temp_analysis_func",
+                  "parameters": {}
             },
             "import_param": {
                   "sep": ",",
@@ -34,15 +46,21 @@
             },
             "clean_file_func": {
                   "module": "",
-                  "func": ""
+                  "func": "",
+                  "parameters": {}
             },
             "read_file_func": {
                   "module": "",
-                  "func": "read_text_file"
+                  "func": "read_text_file",
+                  "parameters": {
+                        "sep": "\t",
+                        "header": 19
+                  }
             },
             "analysis_func": {
                   "module": "",
-                  "func": "temp_analysis_func"
+                  "func": "temp_analysis_func",
+                  "parameters": {}
             },
             "import_param": {
                   "sep": "\t",
