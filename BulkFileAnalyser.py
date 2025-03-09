@@ -15,14 +15,14 @@ TODO
     * default_dir to start looking for data files is temporarily set to location of tekscan test data. This should be
     the last used folder
     ==========
-    Known bugs
+    Much later
     ==========
     * Some of the Tekscan data files have more than 1 data set in them. This will results in rows containing text in
     rows that are defined as numeric types. A utility could be quite easily written to identify and correct these but,
-    given that I'm not likely to be using Tekscan data any time soon, this probably doesn't need to be done and
-    certainly not as part of this script. Do need to make the script more robust in handling such errors though as they
-    could be encountered in other files
-    * reading in delim file is not very robust. Will make a mess of whole import if there's a missing values
+    given that I'm not likely to be using Tekscan data any time soon, this isn't priority.
+    ==========
+    Known bugs
+    ==========
     * Frames within main window do not expand if the window is expanded (probably should disable resizing for other
     windows)
 """
@@ -55,7 +55,7 @@ def get_analysis_profiles():
                     'detail': 'Search path:\n' + analysis_profiles_file
                 })
             except Exception as e:
-                print(str(e))
+                print(repr(e))
                 return ('error', {
                     'message': 'Aborting: Unhandled error reading JSON format information from analysis profile file',
                     'detail': 'Search path:\n' + analysis_profiles_file
@@ -138,11 +138,11 @@ class BuildCue(tk.Frame):
         self.add_folder_btn.pack(padx=pdx, pady=pdy, side=tk.LEFT, anchor=tk.NW)
 
         # Create checkbox to include subfolders
-        self.include_subs = tk.BooleanVar()
+        self.include_subdirs = tk.BooleanVar()
         self.include_subdir_chk = ttk.Checkbutton(
             build_cue_btn_frm,
             text="Include\nsubfolders",
-            variable=self.include_subs)
+            variable=self.include_subdirs)
         self.include_subdir_chk.pack(padx=pdx, pady=pdy, side=tk.LEFT, anchor=tk.NW)
 
         # create button to view/ edit file cue
@@ -330,17 +330,18 @@ class BuildCue(tk.Frame):
             return
 
         file_list = list(self.cued_file_list)  # Start with existing tuple of files (as list)
-        # Combine chosen folder path with wildcard and passed file type
-        if self.include_subs.get():
+
+        # If including subdirectories, add this
+        if self.include_subdirs.get():
             add_subs = "**"
         else:
             add_subs = ""
+        # Combine chosen folder path with wildcard and passed file type
         file_filter = os.path.join(selected_folder, add_subs, "*." + file_type)
-        files = glob.glob(file_filter, recursive=self.include_subs.get())  # Get list of matching files and folders
+        files = glob.glob(file_filter, recursive=self.include_subdirs.get())  # Get list of matching files and folders
         for f in files:  # Add only files (not directories)
             if os.path.isfile(f):
                 file_list.append(f)
-        # self.cued_file_list = tuple(file_list)  # Convert back to tuple
         self.add_files_to_cue(tuple(file_list))  # As tuple to match what add files will produce
 
     def run_analysis_clicked(self):
@@ -494,25 +495,21 @@ class EditCue(tk.Toplevel):
 
 
 def read_text_file(file, import_settings):
-    df = ""  # Unlikely to get to referencing this with error handling below but set just to avoid exceptions
     if os.path.exists(file):  # If the file exists
         try:
             df = pd.read_csv(
                 file,
-                on_bad_lines="warn",
-                **import_settings
-            )
+                **import_settings)
         except Exception as e:
             print('Error reading:', file, '/nError details:', repr(e))
-            return type(e).__name__
-        else: # Read OK
-            if isinstance(df, pd.DataFrame):
-                return df
+            return "", 'FAIL: ' + type(e).__name__  # df, error message to write to file
+        else:  # Read OK
+            if object in list(df.dtypes):
+                return df, "CHECK: Possible errors"  # df, error message to write to file
             else:
-                print('Read error: Not returned as Dataframe', file)  # Wouldn't expect to get here
-                return 'Read did not produce Dataframe'
+                return df, "OK"
     else:
-        return "File not found"
+        return "", "File not found"
 
 
 def save_df_to_file(df, dflt_ext='.csv', incl_index=False, confirm_overwrite=True):
@@ -582,20 +579,19 @@ class RunAnalysis(tk.Toplevel):
         read_file_parameters = file_import_settings["read_file_func"]["parameters"]
         for file in passed_file_list:
             # read_file_function is read from JSON file so won't exist in script
-            data_df = read_file_function(file, read_file_parameters)
+            data_df, read_status = read_file_function(file, read_file_parameters)
             file_results_dict = {
                 "Filename": os.path.splitext(os.path.basename(file))[0],
-                "Path": os.path.dirname(file)
+                "Path": os.path.dirname(file),
+                "Read status": read_status
             }
             if isinstance(data_df, pd.DataFrame):  # If successfully read in data
                 read_success_dict = {
-                    "Read OK": "OK",
                     "Rows": data_df.shape[0],
                     "Columns": data_df.shape[1]
                     }
             else:
                 read_success_dict = {
-                    "Read OK": 'FAIL: ' + data_df,
                     "Rows": 0,
                     "Columns": 0
                     }

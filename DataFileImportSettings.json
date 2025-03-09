@@ -14,7 +14,7 @@
                   "func": "read_text_file",
                    "parameters": {
                         "sep": ",",
-                        "header": 8,
+                        "header": 7,
                         "engine": "python",
                         "skipfooter": 4,
                         "dtype": {
