@@ -3,11 +3,17 @@ TODO
     ====
     NEXT
     ====
+    * Implement reading information from headers (e.g. sample rate, recording date)
+        - TODO: write function
+        - DONE: Potential information added to JSON
+        - TODO: Add to required keys list
+        - TODO: Update information on Git
     * Add some example analyses: Need to think about how to handle this. Should analyses be fixed for analysis types
     (e.g. balance for Tekscan or balance or jump for Bioware?) or should this be separate?
     =====
     Later
     =====
+    * Are there other ways to flag potential read errors (other than column types as object)?
     * padx and pady values are currently set within the classes rather than being passed to them
         - Look at creating a style and setting to widgets
     * Vertical scroll bar on edit files listbox should only display if the number of files displayed is greater than the
@@ -512,6 +518,10 @@ def read_text_file(file, import_settings):
         return "", "File not found"
 
 
+def read_header():
+    pass
+
+
 def save_df_to_file(df, dflt_ext='.csv', incl_index=False, confirm_overwrite=True):
     saved_file = False
     while not saved_file:
@@ -662,7 +672,8 @@ def check_functions(func_to_check):
 
 
 def temp_analysis_func():
-    print("This is just here to give the import profiles something to point at until there's a proper target")
+    # This is just here to give the import profiles something to point at until there's a proper target")
+    pass
 
 
 def main():

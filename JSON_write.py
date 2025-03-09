@@ -1,4 +1,11 @@
-{
+"""
+Quick utility to pretty print dictionary with analysis type profiles information to JSON
+"""
+import os
+import sys
+import json
+
+import_settings = {
       "Balance analysis: Tekscan Footscan SAM (text file)": {
             "file_type": {
                   "type": "csv",
@@ -77,3 +84,8 @@
             }
       }
 }
+
+data_def_file = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), "DataFileImportSettings.json")
+with open(data_def_file, "w") as fp:
+    json.dump(import_settings, fp, indent=6)
+print("File written to:", data_def_file)
