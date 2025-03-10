@@ -8,6 +8,7 @@ TODO
         - DONE: Potential information added to JSON
         - TODO: Add to required keys list
         - TODO: Update information on Git
+        * Write file as text if write to csv fails
     * Add some example analyses: Need to think about how to handle this. Should analyses be fixed for analysis types
     (e.g. balance for Tekscan or balance or jump for Bioware?) or should this be separate?
     =====
