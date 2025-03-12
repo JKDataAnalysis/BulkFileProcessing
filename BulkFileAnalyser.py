@@ -3,6 +3,10 @@ TODO
     ====
     NEXT
     ====
+    * Add TekscanExtract to AnalysisTemplate (and make TekscanAnalysisTemplate)
+        - update file cue with cleaned version of files
+    * Look at raising custom errors at least for fatal errors :
+     https://www.geeksforgeeks.org/define-custom-exceptions-in-python/
     * Implement reading information from headers (e.g. sample rate, recording date)
         - TODO: write function
         - DONE: Potential information added to JSON
@@ -502,6 +506,11 @@ class EditCue(tk.Toplevel):
 
 
 def read_text_file(file, import_settings):
+    """
+    :param file: File path of file to read in
+    :param import_settings: any parameters to pass into the read function (Pandas.read_csv)
+    :return: a tuple containing the dataframe read in and a string indicating read status ('OK' if read successfully)
+    """
     if os.path.exists(file):  # If the file exists
         try:
             df = pd.read_csv(
@@ -524,6 +533,13 @@ def read_header():
 
 
 def save_df_to_file(df, dflt_ext='.csv', incl_index=False, confirm_overwrite=True):
+    """
+    :param df: The Pandas dataframe to be written
+    :param dflt_ext: The filetype extension that will be appended to the file if none is set by the user
+    :param incl_index: Whether to include the index column of the dataframe in the export
+    :param confirm_overwrite: Whether overwriting should be confirmed if the file already exists
+    :return:
+    """
     saved_file = False
     while not saved_file:
         filename = fd.asksaveasfilename(confirmoverwrite=confirm_overwrite, defaultextension=dflt_ext)
@@ -628,8 +644,13 @@ class RunAnalysis(tk.Toplevel):
 
 
 # Should be outwith class
-def check_dict_keys(d, key_list):
-    for key in key_list:
+def check_dict_keys(d, key_check_dict):
+    """
+    :param d: The dictionary to check
+    :param key_check_dict: A dictionary of keys to search the dictionary for
+    :return: False if all keys are found or the value of the first key not found
+    """
+    for key in key_check_dict:
         if key not in d:
             return key  # Return key not found
     return False  # No missing keys found
@@ -673,7 +694,7 @@ def check_functions(func_to_check):
 
 
 def temp_analysis_func():
-    # This is just here to give the import profiles something to point at until there's a proper target")
+    # This is just here to give the import profiles something to point at until there's a proper target
     pass
 
 
