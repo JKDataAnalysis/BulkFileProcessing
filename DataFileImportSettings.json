@@ -5,8 +5,8 @@
                   "label": "Tekscan SAM"
             },
             "clean_file_func": {
-                  "module": "",
-                  "func": "",
+                  "module": "TekscanExtract",
+                  "func": "tekscan_extract",
                   "parameters": {}
             },
             "read_file_func": {

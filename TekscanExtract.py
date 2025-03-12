@@ -1,6 +1,11 @@
 import os
 
 """
+====
+TODO
+====
+* Think about how to record clean errors.
+==========
 KNOWN BUGS
 ==========
 None
@@ -14,7 +19,7 @@ This program remedies that by extracting data sets from the passed file and savi
 """
 
 
-def tekscan_extract(f, search_name='', overwrite=False):
+def tekscan_extract(f, search_name='', overwrite=False, **kwargs):
     """
     :param f: path to file to read from
     :param search_name: The filename to search for in lines in the file starting 'FILENAME'. If this is not, set then

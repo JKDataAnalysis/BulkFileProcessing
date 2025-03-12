@@ -3,8 +3,6 @@ TODO
     ====
     NEXT
     ====
-    * Add TekscanExtract to AnalysisTemplate (and make TekscanAnalysisTemplate)
-        - update file cue with cleaned version of files
     * Look at raising custom errors at least for fatal errors :
      https://www.geeksforgeeks.org/define-custom-exceptions-in-python/
     * Implement reading information from headers (e.g. sample rate, recording date)
@@ -600,11 +598,19 @@ class RunAnalysis(tk.Toplevel):
         close_btn = Button(self, text="Close", command=self.analysis_complete, state=tk.DISABLED)
         close_btn.pack(padx=pdx, pady=pdy)
 
+        print('File handling funcs:', self.file_handling_funcs)
         # Iterate through each file in cue and process
         all_results_list = []  # Create empty list for storing list of dicts of all results
+        clean_file_function = self.file_handling_funcs['clean_file_func']
+        clean_file_parameters = file_import_settings['clean_file_func']['parameters']
         read_file_function = self.file_handling_funcs['read_file_func']
         read_file_parameters = file_import_settings["read_file_func"]["parameters"]
         for file in passed_file_list:
+
+            # clean_file_function is read from JSON file so won't exist in script
+            if clean_file_function: # If a function is given in JSON file rather than ""
+                clean_file_function(file, clean_file_parameters)
+
             # read_file_function is read from JSON file so won't exist in script
             data_df, read_status = read_file_function(file, read_file_parameters)
             file_results_dict = {
