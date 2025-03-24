@@ -1,15 +1,32 @@
 """
 TODO
+    ==========
+    Known bugs
+    ==========
+    * Frames within main window do not expand if the window is expanded (probably should disable resizing for other
+    windows)
     ====
     NEXT
     ====
+    * The function checking routines will not find a module even if it is imported into the calling script. Is that
+    an OK behaviour?
+    * Move functions not directly related to the tkinter classes out of classes
+        - BuildCue - check import profile funcs
+        - EditCue - OK
+        - RunAnalysis -  Only contains __init__
+    * Add notes to rest of functions
+        - DONE: BuildCue class
+        - To do: EditCue class
+        - To do: RunAnalysis class
+        - DONE: none class functions
+    * Work on making it all more OOP.
     * Look at raising custom errors at least for fatal errors :
      https://www.geeksforgeeks.org/define-custom-exceptions-in-python/
     * Implement reading information from headers (e.g. sample rate, recording date)
-        - TODO: write function
+        - DONE: write function
         - DONE: Potential information added to JSON
-        - TODO: Add to required keys list
-        - TODO: Update information on Git
+        - TO DO: Add to required keys list
+        - TO DO: Update information on Git
         * Write file as text if write to csv fails
     * Add some example analyses: Need to think about how to handle this. Should analyses be fixed for analysis types
     (e.g. balance for Tekscan or balance or jump for Bioware?) or should this be separate?
@@ -26,14 +43,6 @@ TODO
     ==========
     Much later
     ==========
-    * Some of the Tekscan data files have more than 1 data set in them. This will results in rows containing text in
-    rows that are defined as numeric types. A utility could be quite easily written to identify and correct these but,
-    given that I'm not likely to be using Tekscan data any time soon, this isn't priority.
-    ==========
-    Known bugs
-    ==========
-    * Frames within main window do not expand if the window is expanded (probably should disable resizing for other
-    windows)
 """
 
 import tkinter as tk
@@ -52,6 +61,10 @@ import importlib
 
 
 def get_analysis_profiles():
+    """
+    Load the analysis profile from JSON file
+    :return: Dictionary of analysis profile or error message
+    """
     # Set file to default location and name
     analysis_profiles_file = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), "DataFileImportSettings.json")
     if os.path.exists(analysis_profiles_file):  # If the default file exists
@@ -90,7 +103,16 @@ def get_analysis_profiles():
 
 
 class BuildCue(tk.Frame):
+    """
+    Tkinter Frame to select analysis profile type, add files to cue and trigger analysis
+    """
     def __init__(self, data_file_definitions, master=None, **kwargs):
+        """
+
+        :param data_file_definitions: Dictionary of data file definitions
+        :param master:
+        :param kwargs: Any other keywords
+        """
         super().__init__(master, **kwargs)
         self.file_import_settings = None
         self.cued_file_list = None
@@ -193,12 +215,19 @@ class BuildCue(tk.Frame):
         self.reset_window()
 
     def check_import_profile(self, selected_import_settings):
+        """
+        Check that the selected import profile contains all of the required keys and that the functions listed are valid
+        :param selected_import_settings: Dictionary of import settings to check
+        :return: Dictionary of function objects or an error message
+        """
         # Dictionary of keys that selected import settings must contain to be valid
         required_keys_list = {
             "file_type": ["type", "label"],
             "clean_file_func": ["module", "func", "parameters"],
             "read_file_func": ["module", "func", "parameters"],
-            "analysis_func": ["module", "func", "parameters"]}
+            "analysis_func": ["module", "func", "parameters"],
+            "read_header_func": ["module", "func", "parameters", "headers"],
+        }
 
         # Check selected dictionary against required keys
         key_error = self.check_import_setting_keys(selected_import_settings, required_keys_list)
@@ -207,13 +236,18 @@ class BuildCue(tk.Frame):
 
         # Filter dictionary keys for only those that end in '_func'
         func_dict = {k: v for k, v in selected_import_settings.items() if k.endswith('_func')}
-        return self.check_import_setting_func(func_dict)
+        return self.check_build_func(func_dict)
 
         # # Functions can now be called by filtering the dictionary for the required key/ value pair as:
         # self.file_handling_funcs['read_file_func']()
         # self.file_handling_funcs['analysis_func']()
 
     def analysis_type_selected(self, event):
+        """
+        Callback for when an analysis type is selected in the combobox
+        :param event: event object from TkInter widget
+        :return: None
+        """
         # Get the analysis type selected in the combo box
         selected_analysis_type = self.analysis_type_combo.get()
 
@@ -246,12 +280,17 @@ class BuildCue(tk.Frame):
             self.include_subdir_chk['state'] = tk.NORMAL
             self.file_handling_funcs = functions
 
-    def add_files_btns_clicked(self, path_type):
-        if path_type == "files":  # Add files button clicked
+    def add_files_btns_clicked(self, file_folder):
+        """
+        Callback for when either 'Add files' or 'Add folder' button is clicked
+        :param file_folder: flag for whether 'Add files' ('files') or 'Add folder' ('folder' button was clicked
+        :return: None
+        """
+        if file_folder == "files":  # Add files button clicked
             self.add_files(
                 self.file_import_settings["file_type"]["type"],
                 self.file_import_settings["file_type"]["label"])
-        elif path_type == "folder":  # Add folders button clicked
+        elif file_folder == "folder":  # Add folders button clicked
             self.add_folder(self.file_import_settings["file_type"]["type"])
         else:  # How the hell did we get here?
             messagebox.showerror(
@@ -260,6 +299,13 @@ class BuildCue(tk.Frame):
             self.quit_script()
 
     def check_import_setting_keys(self, dict_to_check, check_list):
+        """
+        check that the dictionary contains all the keys in the check-list
+        :param dict_to_check: dictionary to check
+        :param check_list: Keys that the dictionary should be checked for (also as dict)
+        :return: False if there are no errors with any of the keys, i.e. all found or an error message string on the
+         first key not found
+        """
         # Check first level keys
         k = check_dict_keys(dict_to_check.keys(), check_list.keys())
         if k:  # Errors found in first level keys
@@ -274,11 +320,18 @@ class BuildCue(tk.Frame):
                     return f"Second level: key '{sub_key}' not found"  # Errors found in second level keys
         return False  # No errors found
 
-    def check_import_setting_func(self, func_dict):
+    def check_build_func(self, func_dict):
+        """
+        Build a dictionary object of function objects after having first checked that they are all valid
+        :param func_dict: Dictionary of modules and functions {"module":value, "func": value}.
+        :return: dictionary of function objects or error message string
+        """
         functions = {}
         for d in func_dict:
             # Check function unless it's the clean_file_func (optional) AND there is no value set for func
-            if not (d == "clean_file_func" and not func_dict[d]['func']):  # Empty string will return as True
+            if d == "clean_file_func" and not func_dict[d]['func']:  # Empty string will return as True
+                functions[d] = None
+            else:
                 r = check_functions(func_dict[d])
                 if isinstance(r, str):  # If returned an error message
                     return d + ': ' + r
@@ -287,6 +340,11 @@ class BuildCue(tk.Frame):
         return functions
 
     def add_files_to_cue(self, file_list):
+        """
+        Add passed file list to cue and update the file count and enable buttons for next stage
+        :param file_list: List of files to add (list)
+        :return: None
+        """
         passed_file_count = len(file_list)
 
         self.cued_file_list += file_list
@@ -314,6 +372,12 @@ class BuildCue(tk.Frame):
         self.update_cue_count_lbl()
 
     def add_files(self, file_type, file_type_label):
+        """
+        Allow user to select file(s) to be added to the cue
+        :param file_type: file type to filter displayed files by
+        :param file_type_label: Label to use in the 'file type' combobox in the askopenfilenames dialogue box
+        :return: tuple of chosen files
+        """
         filetypes = (
             (file_type_label, "*." + file_type),
             ('All files (may not be compatible)', '*.*')
@@ -329,6 +393,11 @@ class BuildCue(tk.Frame):
         self.add_files_to_cue(selected_file_list)  # Remove duplicates and update count
 
     def add_folder(self, file_type):
+        """
+        Allow user to select folder from which all files matching file_type will be added to the cue
+        :param file_type: file type to filter files by
+        :return: tuple of chosen files
+        """
         default_dir = '/home/jon/Documents/TestData/RecentData'
         selected_folder = fd.askdirectory(
             title='Open files',
@@ -354,6 +423,11 @@ class BuildCue(tk.Frame):
         self.add_files_to_cue(tuple(file_list))  # As tuple to match what add files will produce
 
     def run_analysis_clicked(self):
+        """
+        Callback for when 'Run analysis' button is clicked. Opens RunAnalysis top level frame. Optionally clears file
+        cue when RunAnalysis frame is closed
+        :return: None
+        """
         RunAnalysis(
             self.cued_file_list,
             self.file_import_settings,
@@ -370,6 +444,10 @@ class BuildCue(tk.Frame):
             self.run_analysis_btn['state'] = tk.DISABLED  # Disable run analysis button
 
     def reset_window(self):
+        """
+        Set items in BuildCue tk.Frame to their initial state.
+        :return: None
+        """
         self.cued_file_list = tuple()  # Clear the file cue
         self.cued_file_count = 0  # Reset file counter
         self.update_cue_count_lbl()  # Update the displayed value
@@ -382,6 +460,11 @@ class BuildCue(tk.Frame):
         self.run_analysis_btn['state'] = tk.DISABLED  # Disable run analysis button
 
     def edit_cue_clicked(self):
+        """
+        Callback for when 'Edit Cue' button is clicked. Opens EditCue top level frame. When EditCue frame is closed
+        updates the file cue information.
+        :return: None
+        """
         # self.file_cue_window.title('File cue')
         edited_file_list = EditCue(self.cued_file_list, self)  # Create pop-up for editing list
         if edited_file_list.saved_changes:  # Changes have been made and saved
@@ -393,9 +476,16 @@ class BuildCue(tk.Frame):
                 self.edit_files_btn['state'] = tk.DISABLED
 
     def update_cue_count_lbl(self):
+        """
+        Updates the cue count label
+        :return: None
+        """
         self.cued_file_count_lbl.config(text=str(self.cued_file_count) + " files cued")
 
     def quit_script(self):
+        """"
+        Closes BuildCue tk.frame and exits script
+        """
         print("Leaving program")
         self.destroy()
         exit()
@@ -532,6 +622,7 @@ def read_header():
 
 def save_df_to_file(df, dflt_ext='.csv', incl_index=False, confirm_overwrite=True):
     """
+    Saves the passed Pandas Dataframe to a csv file. The user is asked for the file to save to.
     :param df: The Pandas dataframe to be written
     :param dflt_ext: The filetype extension that will be appended to the file if none is set by the user
     :param incl_index: Whether to include the index column of the dataframe in the export
@@ -598,9 +689,9 @@ class RunAnalysis(tk.Toplevel):
         close_btn = Button(self, text="Close", command=self.analysis_complete, state=tk.DISABLED)
         close_btn.pack(padx=pdx, pady=pdy)
 
-        print('File handling funcs:', self.file_handling_funcs)
         # Iterate through each file in cue and process
         all_results_list = []  # Create empty list for storing list of dicts of all results
+        # if not self.file_handling_funcs['clean_file_func'] == None:  # If a function is given in JSON file rather than ""
         clean_file_function = self.file_handling_funcs['clean_file_func']
         clean_file_parameters = file_import_settings['clean_file_func']['parameters']
         read_file_function = self.file_handling_funcs['read_file_func']
@@ -608,7 +699,7 @@ class RunAnalysis(tk.Toplevel):
         for file in passed_file_list:
 
             # clean_file_function is read from JSON file so won't exist in script
-            if clean_file_function: # If a function is given in JSON file rather than ""
+            if clean_file_function is not None:  # If a function is given in JSON file rather than ""
                 clean_file_function(file, clean_file_parameters)
 
             # read_file_function is read from JSON file so won't exist in script
@@ -663,6 +754,11 @@ def check_dict_keys(d, key_check_dict):
 
 
 def check_functions(func_to_check):
+    """
+    Check whether function is valid
+    :param func_to_check: dictionary {'module', 'func'}
+    :return: function object or error string
+    """
     module = func_to_check['module']
     func = func_to_check['func']
 

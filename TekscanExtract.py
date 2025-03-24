@@ -1,26 +1,18 @@
 import os
 
 """
-====
-TODO
-====
-* Think about how to record clean errors.
-==========
-KNOWN BUGS
-==========
-None
-"""
-"""
-There is a problem with the file exporting from Tekscan Footscan in that, if more than one windows are open when a file
-is export, then all open files will be included in the export. One of the issues that this creates is that if the data
-is read in from the file, then the second and later data sets headers will be read in as data leading to read errors and
-also meaning data from different data sets could be merged.
-This program remedies that by extracting data sets from the passed file and saving these or overwriting the original
+This function has now been moved to AnalysisTemplate_Tekscan
 """
 
 
 def tekscan_extract(f, search_name='', overwrite=False, **kwargs):
     """
+    There is a problem with the file exporting from Tekscan Footscan in that, if more than one windows are open when a
+    file is export, then all open files will be included in the export. One of the issues that this creates is that if
+    the data is read in from the file, then the second and later data sets headers will be read in as data leading to
+    data type errors and also meaning data from different data sets could be merged. This function remedies that by
+    extracting data sets from the passed file and saving these to a backup folder or overwriting the original.
+
     :param f: path to file to read from
     :param search_name: The filename to search for in lines in the file starting 'FILENAME'. If this is not, set then
     the base name of the file passed will be used.

@@ -40,15 +40,21 @@ import_settings = {
                   "func": "read_header",
                   "parameters": {},
                   "headers": {
-                        "Label 1": {
-                              "read_line": "",
-                              "regex": "",
-                              "dtype": ""
+                        "Sample rate": {
+                              "read_line": 6,
+                              "regex": r"\d+$",
+                              "data_type": "int"
                         },
-                        "Label 2": {
-                              "read_line": "",
-                              "regex": "",
-                              "dtype": ""
+                        "Date": {
+                              "read_line": 8,
+                              "regex": r"\d{1,2}\b.{1,}\b\d{2}[:]\d{2}[:]\d{2}$",
+                              "data_type": "date_time",
+                              "date_time_format": "%d %B %Y %H:%M:%S"
+                        },
+                        "Filename": {
+                              "read_line": 5,
+                              "regex": r"\w{1,}.fsx$",
+                              "data_type": "str"
                         }
                   }
             }
@@ -88,4 +94,5 @@ import_settings = {
 data_def_file = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), "DataFileImportSettings.json")
 with open(data_def_file, "w") as fp:
     json.dump(import_settings, fp, indent=6)
+
 print("File written to:", data_def_file)

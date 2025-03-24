@@ -5,7 +5,7 @@
                   "label": "Tekscan SAM"
             },
             "clean_file_func": {
-                  "module": "TekscanExtract",
+                  "module": "AnalysisTemplate_Tekscan",
                   "func": "tekscan_extract",
                   "parameters": {}
             },
@@ -33,15 +33,21 @@
                   "func": "read_header",
                   "parameters": {},
                   "headers": {
-                        "Label 1": {
-                              "read_line": "",
-                              "regex": "",
-                              "dtype": ""
+                        "Sample rate": {
+                              "read_line": 6,
+                              "regex": "\\d+$",
+                              "data_type": "int"
                         },
-                        "Label 2": {
-                              "read_line": "",
-                              "regex": "",
-                              "dtype": ""
+                        "Date": {
+                              "read_line": 8,
+                              "regex": "\\d{1,2}\\b.{1,}\\b\\d{2}[:]\\d{2}[:]\\d{2}$",
+                              "data_type": "date_time",
+                              "date_time_format": "%d %B %Y %H:%M:%S"
+                        },
+                        "Filename": {
+                              "read_line": 5,
+                              "regex": "\\w{1,}.fsx$",
+                              "data_type": "str"
                         }
                   }
             }
